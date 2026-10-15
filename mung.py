@@ -220,6 +220,19 @@ if os.environ.get("START_POLLER", "1") == "1":
     threading.Thread(target=poller, daemon=True).start()
     os.environ["START_POLLER"] = "0"
 
+# ------------------------------------------------------------------
+# Startup — runs on import (works under gunicorn) AND locally
+# ------------------------------------------------------------------
+init_db()
+
+# Start the background poller exactly once.
+# gunicorn imports this module; __name__ is "mung", not "__main__".
+# The START_POLLER env guard prevents duplicate threads if gunicorn
+# spawns multiple workers.
+if os.environ.get("START_POLLER", "1") == "1":
+    threading.Thread(target=poller, daemon=True).start()
+    os.environ["START_POLLER"] = "0"
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=False, host="0.0.0.0", port=port, threaded=True)
