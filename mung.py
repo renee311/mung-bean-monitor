@@ -11,13 +11,9 @@ from urllib3.util.retry import Retry
 app = Flask(__name__)
 
 # ------------------------------------------------------------------
-# Blynk Configuration  (reads from environment variable on Render,
-# falls back to the hardcoded value for local testing)
+# Blynk Configuration
 # ------------------------------------------------------------------
-BLYNK_AUTH_TOKEN = os.environ.get(
-    "BLYNK_AUTH_TOKEN",
-    "auWNqgLcgtwQ6lQCbhQzCJbeoANRG3KF"   # local fallback only
-)
+BLYNK_AUTH_TOKEN = os.environ.get("BLYNK_AUTH_TOKEN", "")
 BLYNK_SERVER = "https://blynk.cloud/external/api"
 DB_NAME = "mung_bean_history.db"
 
@@ -45,7 +41,7 @@ latest_data = {
 }
 data_lock = threading.Lock()
 
-# Retrying HTTP session
+# Retrying HTTP session for Blynk
 _session = requests.Session()
 _retry = Retry(
     total=3,
@@ -105,7 +101,7 @@ def fetch_blynk_pins(pins):
     try:
         r = _session.get(url, timeout=(3, 6))
         if r.status_code != 200:
-            print(f"Blynk returned HTTP {r.status_code}")
+            print(f"Blynk returned HTTP {r.status_code}: {r.text[:120]}")
             return None
         raw = r.json()
         if not isinstance(raw, dict):
@@ -121,6 +117,7 @@ def fetch_device_online():
     try:
         r = _session.get(url, timeout=(3, 6))
         if r.status_code != 200:
+            print(f"Blynk (isHardwareConnected) HTTP {r.status_code}: {r.text[:120]}")
             return None
         return r.text.strip().lower() == "true"
     except Exception as e:
@@ -132,49 +129,56 @@ def fetch_device_online():
 # Background poller
 # ------------------------------------------------------------------
 def poller():
+    print("[poller] thread started")
     last_log = 0.0
     while True:
-        started = time.time()
-        device_online = fetch_device_online()
-        values = fetch_blynk_pins(list(VIRTUAL_PINS.values())) if device_online else None
+        try:
+            started = time.time()
+            device_online = fetch_device_online()
+            values = fetch_blynk_pins(list(VIRTUAL_PINS.values())) if device_online else None
 
-        with data_lock:
-            if device_online is None or (device_online and values is None):
-                latest_data["cloud_ok"] = False
-                latest_data["online"] = False
-                latest_data["status"] = "cloud_error"
-                latest_data["status_message"] = "Cannot reach Blynk cloud"
-            elif not device_online:
-                latest_data.update({
-                    "pump": 0, "fan": 0, "light": 0,
-                    "online": False,
-                    "cloud_ok": True,
-                    "status": "offline",
-                    "status_message": "Device not connected",
-                })
-            else:
-                latest_data.update({
-                    "temp":     values[VIRTUAL_PINS["temp"]],
-                    "humidity": values[VIRTUAL_PINS["humidity"]],
-                    "moisture": int(values[VIRTUAL_PINS["moisture"]]),
-                    "height":   values[VIRTUAL_PINS["height"]],
-                    "pump":     int(values[VIRTUAL_PINS["pump"]]),
-                    "fan":      int(values[VIRTUAL_PINS["fan"]]),
-                    "light":    int(values[VIRTUAL_PINS["light"]]),
-                    "online": True,
-                    "cloud_ok": True,
-                    "updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "status": "online",
-                    "status_message": "All systems normal",
-                })
-            snapshot = dict(latest_data)
+            with data_lock:
+                if device_online is None or (device_online and values is None):
+                    latest_data["cloud_ok"] = False
+                    latest_data["online"] = False
+                    latest_data["status"] = "cloud_error"
+                    latest_data["status_message"] = "Cannot reach Blynk cloud"
+                elif not device_online:
+                    latest_data.update({
+                        "pump": 0, "fan": 0, "light": 0,
+                        "online": False,
+                        "cloud_ok": True,
+                        "status": "offline",
+                        "status_message": "Device not connected",
+                    })
+                else:
+                    latest_data.update({
+                        "temp":     values[VIRTUAL_PINS["temp"]],
+                        "humidity": values[VIRTUAL_PINS["humidity"]],
+                        "moisture": int(values[VIRTUAL_PINS["moisture"]]),
+                        "height":   values[VIRTUAL_PINS["height"]],
+                        "pump":     int(values[VIRTUAL_PINS["pump"]]),
+                        "fan":      int(values[VIRTUAL_PINS["fan"]]),
+                        "light":    int(values[VIRTUAL_PINS["light"]]),
+                        "online": True,
+                        "cloud_ok": True,
+                        "updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "status": "online",
+                        "status_message": "All systems normal",
+                    })
+                snapshot = dict(latest_data)
 
-        if snapshot["online"] and time.time() - last_log >= LOG_INTERVAL:
-            log_to_db(snapshot)
-            last_log = time.time()
+            if snapshot["online"] and time.time() - last_log >= LOG_INTERVAL:
+                log_to_db(snapshot)
+                last_log = time.time()
 
-        elapsed = time.time() - started
-        time.sleep(max(0.0, POLL_INTERVAL - elapsed))
+            elapsed = time.time() - started
+            time.sleep(max(0.0, POLL_INTERVAL - elapsed))
+
+        except Exception as e:
+            # Never let the poller thread die — keep it alive no matter what
+            print(f"[poller] unexpected error: {e}")
+            time.sleep(1.0)
 
 
 # ------------------------------------------------------------------
@@ -208,30 +212,46 @@ def get_history():
     ])
 
 
+@app.route("/api/debug")
+def debug_info():
+    """Temporary endpoint for diagnosing connectivity."""
+    import platform
+    info = {
+        "python": platform.python_version(),
+        "token_set": bool(BLYNK_AUTH_TOKEN),
+        "token_prefix": BLYNK_AUTH_TOKEN[:6] + "..." if BLYNK_AUTH_TOKEN else None,
+        "blynk_server": BLYNK_SERVER,
+    }
+    # Try a direct Blynk call
+    url = f"{BLYNK_SERVER}/isHardwareConnected?token={BLYNK_AUTH_TOKEN}"
+    try:
+        r = requests.get(url, timeout=10)
+        info["blynk_status_code"] = r.status_code
+        info["blynk_body"] = r.text[:200]
+    except Exception as e:
+        info["blynk_error"] = str(e)
+
+    with data_lock:
+        info["latest_data"] = dict(latest_data)
+    return jsonify(info)
+
+
 # ------------------------------------------------------------------
-# Entry point — works both locally (python mung.py) and on Render
-# (gunicorn mung:app). The poller is started once, guarded by an
-# environment flag so it doesn't spawn multiple threads under
-# multi-worker servers.
+# Startup — runs both locally AND under gunicorn
 # ------------------------------------------------------------------
+print("[startup] mung.py loaded, __name__ =", __name__)
 init_db()
+print("[startup] database ready")
 
+# Start the poller exactly once, whether running via `python mung.py`
+# or `gunicorn mung:app`. The START_POLLER env guard prevents
+# duplicate threads if gunicorn spawns multiple workers.
 if os.environ.get("START_POLLER", "1") == "1":
-    threading.Thread(target=poller, daemon=True).start()
+    threading.Thread(target=poller, daemon=True, name="blynk-poller").start()
     os.environ["START_POLLER"] = "0"
-
-# ------------------------------------------------------------------
-# Startup — runs on import (works under gunicorn) AND locally
-# ------------------------------------------------------------------
-init_db()
-
-# Start the background poller exactly once.
-# gunicorn imports this module; __name__ is "mung", not "__main__".
-# The START_POLLER env guard prevents duplicate threads if gunicorn
-# spawns multiple workers.
-if os.environ.get("START_POLLER", "1") == "1":
-    threading.Thread(target=poller, daemon=True).start()
-    os.environ["START_POLLER"] = "0"
+    print("[startup] poller thread launched")
+else:
+    print("[startup] poller already running in another worker, skipping")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
