@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mung Bean Farm · Smart Agriculture Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --soil-dark: #2d1e12;
+            --soil: #3d2b1f;
+            --bark: #5c4033;
+            --leaf-dark: #1b4332;
+            --leaf: #2d6a4f;
+            --leaf-mid: #40916c;
+            --leaf-light: #74c69d;
+            --leaf-pale: #d8f3dc;
+            --wheat: #e9c46a;
+            --wheat-dark: #c99b3f;
+            --sky: #a8dadc;
+            --sky-dark: #457b9d;
+            --sun: #f4a261;
+            --alert: #bc4749;
+            --paper: #fefae0;
+            --card-bg: #ffffff;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background:
+                radial-gradient(circle at 10% 0%, rgba(116,198,157,0.15), transparent 40%),
+                radial-gradient(circle at 90% 100%, rgba(233,196,106,0.12), transparent 40%),
+                linear-gradient(160deg, #0f2419 0%, #1b4332 45%, #2d6a4f 100%);
+            min-height: 100vh;
+            color: #1b2a1f;
+            padding: 24px 20px 60px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Subtle leaf pattern overlay */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 20% 30%, rgba(216,243,220,0.04) 2px, transparent 3px),
+                radial-gradient(circle at 70% 60%, rgba(216,243,220,0.04) 2px, transparent 3px),
+                radial-gradient(circle at 40% 80%, rgba(216,243,220,0.03) 2px, transparent 3px);
+            background-size: 120px 120px, 180px 180px, 90px 90px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .wrap { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; }
+
+        /* ---------- HEADER ---------- */
+        .farm-header {
+            text-align: center;
+            margin-bottom: 28px;
+            color: var(--leaf-pale);
+        }
+        .farm-header .eyebrow {
+            font-size: 0.78rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--leaf-light);
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .farm-header h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(1.7rem, 3.4vw, 2.6rem);
+            font-weight: 700;
+            color: #f1faee;
+            letter-spacing: 0.5px;
+            text-shadow: 0 2px 20px rgba(0,0,0,0.35);
+        }
+        .farm-header h1 .emoji { filter: drop-shadow(0 0 6px rgba(116,198,157,0.6)); }
+        .farm-header .subtitle {
+            font-size: 0.92rem;
+            color: rgba(216,243,220,0.7);
+            margin-top: 8px;
+        }
+
+        /* ---------- IOT STATUS BAR ---------- */
+        .iot-status-bar {
+            background: linear-gradient(90deg, rgba(15,36,25,0.85), rgba(27,67,50,0.85));
+            border-radius: 16px;
+            padding: 14px 22px;
+            margin-bottom: 26px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(216,243,220,0.08);
+            border: 1px solid rgba(116,198,157,0.25);
+            color: #e0f2e9;
+            backdrop-filter: blur(6px);
+        }
+        .iot-left { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+        .iot-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0,0,0,0.25);
+            padding: 8px 16px;
+            border-radius: 30px;
+            border: 1px solid rgba(116,198,157,0.2);
+        }
+        .iot-dot {
+            width: 12px; height: 12px; border-radius: 50%;
+            background: #9e9e9e;
+            transition: background 0.3s, box-shadow 0.3s;
+            flex-shrink: 0;
+        }
+        .iot-dot.online { background: #74c69d; box-shadow: 0 0 12px #74c69d; animation: pulse 2s infinite; }
+        .iot-dot.offline { background: var(--alert); box-shadow: 0 0 8px var(--alert); }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.55; }
+        }
+        .iot-label { font-size: 0.9rem; font-weight: 600; letter-spacing: 0.3px; }
+        .iot-last-update { font-size: 0.78rem; color: rgba(216,243,220,0.6); }
+
+        .iot-metrics {
+            display: flex;
+            gap: 22px;
+            font-size: 0.86rem;
+            background: rgba(0,0,0,0.22);
+            padding: 8px 20px;
+            border-radius: 30px;
+            flex-wrap: wrap;
+            border: 1px solid rgba(116,198,157,0.15);
+        }
+        .iot-metrics span { display: flex; align-items: center; gap: 6px; color: rgba(216,243,220,0.85); }
+        .iot-metrics strong { color: #f1faee; font-weight: 700; margin-left: 2px; }
+
+        /* ---------- SECTION TITLES ---------- */
+        .section-title {
+            font-family: 'Playfair Display', serif;
+            color: var(--leaf-pale);
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin: 30px 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: 0.3px;
+        }
+        .section-title::before {
+            content: "";
+            width: 26px; height: 3px;
+            background: linear-gradient(90deg, var(--leaf-light), var(--wheat));
+            border-radius: 2px;
+        }
+
+        /* ---------- TELEMETRY CARDS ---------- */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 18px;
+            margin-bottom: 8px;
+        }
+        .card {
+            background: var(--card-bg);
+            padding: 22px 20px 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.18), inset 0 -3px 0 rgba(45,106,79,0.06);
+            text-align: center;
+            transition: transform 0.25s ease, box-shadow 0.25s ease, opacity 0.3s;
+            position: relative;
+            overflow: hidden;
+            border-top: 3px solid var(--leaf-mid);
+        }
+        .card::after {
+            content: "";
+            position: absolute;
+            top: -30px; right: -30px;
+            width: 90px; height: 90px;
+            background: radial-gradient(circle, rgba(116,198,157,0.14), transparent 70%);
+            border-radius: 50%;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 14px 34px rgba(0,0,0,0.25), inset 0 -3px 0 rgba(45,106,79,0.1);
+        }
+        .card .card-icon {
+            font-size: 1.6rem;
+            margin-bottom: 8px;
+            display: block;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.12));
+        }
+        .card h3 {
+            color: #6b7d6f;
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+        .card .value {
+            font-size: 1.95rem;
+            font-weight: 700;
+            color: var(--leaf-dark);
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
+        }
+        .card .unit {
+            font-size: 1rem;
+            color: var(--leaf-mid);
+            font-weight: 500;
+            margin-left: 2px;
+        }
+
+        /* Card color themes */
+        .card.temp { border-top-color: var(--sun); }
+        .card.temp .value { color: #c1440e; }
+        .card.humidity { border-top-color: var(--sky-dark); }
+        .card.humidity .value { color: #2a6f97; }
+        .card.moisture { border-top-color: var(--bark); }
+        .card.moisture .value { color: #6b4423; }
+        .card.height { border-top-color: var(--leaf); }
+        .card.height .value { color: var(--leaf); }
+
+        body.device-offline .card {
+            opacity: 0.55;
+            filter: grayscale(0.4);
+        }
+        body.device-offline .card .value { color: #94a39a; }
+
+        /* ---------- SOIL MOISTURE GAUGE ---------- */
+        .gauge-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 22px;
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+            border-top: 3px solid var(--bark);
+            position: relative;
+            overflow: hidden;
+        }
+        .gauge-card h3 {
+            color: #6b7d6f;
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+        .gauge-ring {
+            position: relative;
+            width: 140px;
+            height: 140px;
+            margin: 0 auto;
+        }
+        .gauge-ring svg { transform: rotate(-90deg); }
+        .gauge-track { fill: none; stroke: #e8efe9; stroke-width: 12; }
+        .gauge-fill { fill: none; stroke-width: 12; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease, stroke 0.6s ease; }
+        .gauge-value {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .gauge-value .num {
+            font-size: 1.7rem;
+            font-weight: 700;
+            color: #6b4423;
+            line-height: 1;
+        }
+        .gauge-value .lbl {
+            font-size: 0.7rem;
+            color: #94a39a;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+        .gauge-legend {
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            margin-top: 14px;
+            font-size: 0.7rem;
+            color: #7a8a7e;
+        }
+        .gauge-legend span { display: flex; align-items: center; gap: 5px; }
+        .gauge-legend .dot { width: 9px; height: 9px; border-radius: 50%; }
+
+        /* ---------- RELAY / ACTUATOR CARDS ---------- */
+        .relay-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 18px;
+        }
+        .relay-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            transition: opacity 0.3s, transform 0.2s;
+            border-left: 4px solid var(--leaf-mid);
+        }
+        .relay-card:hover { transform: translateY(-3px); }
+        .relay-card .info { display: flex; align-items: center; gap: 12px; }
+        .relay-card .icon {
+            font-size: 1.5rem;
+            width: 46px; height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--leaf-pale);
+            border-radius: 12px;
+        }
+        .relay-card h3 {
+            font-size: 0.82rem;
+            color: #4a5a50;
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+        .relay-card .sub { font-size: 0.7rem; color: #9aa89f; }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: white;
+            letter-spacing: 0.5px;
+            min-width: 66px;
+            justify-content: center;
+            transition: background 0.3s;
+        }
+        .status-pill::before {
+            content: "";
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.85);
+        }
+        .status-pill.on {
+            background: linear-gradient(135deg, var(--leaf), var(--leaf-mid));
+            box-shadow: 0 0 12px rgba(64,145,108,0.5);
+        }
+        .status-pill.off {
+            background: linear-gradient(135deg, #8a8f8c, #a5aba8);
+        }
+        body.device-offline .relay-card { opacity: 0.55; }
+
+        /* ---------- CHART PANELS ---------- */
+        .chart-panel {
+            background: var(--card-bg);
+            padding: 22px 22px 16px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+            margin-bottom: 22px;
+            border-top: 3px solid var(--leaf-mid);
+        }
+        .chart-panel .panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .chart-panel .panel-head h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.1rem;
+            color: var(--leaf-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .chart-panel .panel-head .hint {
+            font-size: 0.72rem;
+            color: #94a39a;
+            background: var(--leaf-pale);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        /* Two-column chart layout for bigger screens */
+        .chart-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 22px;
+        }
+        @media (min-width: 900px) {
+            .chart-row { grid-template-columns: 1.4fr 1fr; }
+            .chart-row .chart-panel { margin-bottom: 0; }
+        }
+
+        /* ---------- ALERT STRIP ---------- */
+        .alert-strip {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            background: linear-gradient(90deg, #fff3cd, #ffe8a3);
+            border-left: 4px solid var(--wheat-dark);
+            color: #7a5c1e;
+            padding: 12px 18px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 22px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+        }
+        .alert-strip.show { display: flex; animation: slideDown 0.4s ease; }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ---------- FOOTER ---------- */
+        .farm-footer {
+            text-align: center;
+            margin-top: 40px;
+            color: rgba(216,243,220,0.45);
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+        }
+        .farm-footer .divider {
+            width: 60px; height: 1px;
+            background: rgba(116,198,157,0.3);
+            margin: 0 auto 12px;
+        }
+
+        /* ---------- RESPONSIVE ---------- */
+        @media (max-width: 640px) {
+            body { padding: 16px 12px 40px; }
+            .iot-status-bar { padding: 12px 16px; }
+            .iot-metrics { gap: 12px; font-size: 0.78rem; padding: 6px 12px; }
+            .card .value { font-size: 1.6rem; }
+            .relay-card { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .relay-card .status-pill { align-self: flex-end; }
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+
+    <!-- ============ FARM HEADER ============ -->
+    <header class="farm-header">
+        <div class="eyebrow">Smart Agriculture · Precision Farming</div>
+        <h1><span class="emoji">🌾</span> Mung Bean Field Station</h1>
+        <p class="subtitle">Live environmental telemetry &amp; automated greenhouse control</p>
+    </header>
+
+    <!-- ============ IOT STATUS BAR ============ -->
+    <div class="iot-status-bar" id="iotStatusBar">
+        <div class="iot-left">
+            <div class="iot-indicator">
+                <span class="iot-dot" id="iotDot"></span>
+                <span class="iot-label" id="iotStatusLabel">Checking…</span>
+            </div>
+            <span class="iot-last-update" id="iotLastSeen"></span>
+        </div>
+        <div class="iot-metrics">
+            <span>🛰️ <strong>Blynk</strong> Cloud</span>
+            <span>🌡️ <strong id="iotTemp">--</strong>°C</span>
+            <span>💧 <strong id="iotHum">--</strong>%</span>
+            <span>🌱 <strong id="iotMoist">--</strong></span>
+        </div>
+    </div>
+
+    <!-- ============ ALERT STRIP ============ -->
+    <div class="alert-strip" id="alertStrip">
+        <span>⚠️</span>
+        <span id="alertText">Alert</span>
+    </div>
+
+    <!-- ============ TELEMETRY CARDS ============ -->
+    <h2 class="section-title">Field Readings</h2>
+    <div class="grid-container">
+        <div class="card temp">
+            <span class="card-icon">🌡️</span>
+            <h3>Air Temperature</h3>
+            <div class="value"><span id="temp">--</span><span class="unit">°C</span></div>
+        </div>
+        <div class="card humidity">
+            <span class="card-icon">💧</span>
+            <h3>Relative Humidity</h3>
+            <div class="value"><span id="humidity">--</span><span class="unit">%</span></div>
+        </div>
+        <div class="card moisture">
+            <span class="card-icon">🌱</span>
+            <h3>Soil Moisture</h3>
+            <div class="value"><span id="moisture">--</span></div>
+        </div>
+        <div class="card height">
+            <span class="card-icon">📏</span>
+            <h3>Plant Height</h3>
+            <div class="value"><span id="height">--</span><span class="unit">cm</span></div>
+        </div>
+    </div>
+
+    <!-- ============ SOIL GAUGE + RELAYS ============ -->
+    <h2 class="section-title">Irrigation &amp; Climate Control</h2>
+    <div class="chart-row">
+        <div class="gauge-card">
+            <h3>🌾 Soil Moisture Index</h3>
+            <div class="gauge-ring">
+                <svg width="140" height="140" viewBox="0 0 140 140">
+                    <circle class="gauge-track" cx="70" cy="70" r="58"></circle>
+                    <circle class="gauge-fill" id="moistureGauge" cx="70" cy="70" r="58"
+                            stroke-dasharray="364.4"
+                            stroke-dashoffset="364.4"
+                            stroke="#40916c"></circle>
+                </svg>
+                <div class="gauge-value">
+                    <span class="num" id="gaugeNum">--</span>
+                    <span class="lbl" id="gaugeLabel">Raw ADC</span>
+                </div>
+            </div>
+            <div class="gauge-legend">
+                <span><span class="dot" style="background:#bc4749"></span>Dry</span>
+                <span><span class="dot" style="background:#e9c46a"></span>Moderate</span>
+                <span><span class="dot" style="background:#40916c"></span>Optimal</span>
+            </div>
+        </div>
+
+        <div class="relay-grid">
+            <div class="relay-card">
+                <div class="info">
+                    <div class="icon">🚰</div>
+                    <div>
+                        <h3>Water Pump</h3>
+                        <div class="sub">Irrigation relay</div>
+                    </div>
+                </div>
+                <span id="pump-status" class="status-pill off">OFF</span>
+            </div>
+            <div class="relay-card">
+                <div class="info">
+                    <div class="icon">🌀</div>
+                    <div>
+                        <h3>Cooling Fan</h3>
+                        <div class="sub">Ventilation relay</div>
+                    </div>
+                </div>
+                <span id="fan-status" class="status-pill off">OFF</span>
+            </div>
+            <div class="relay-card">
+                <div class="info">
+                    <div class="icon">💡</div>
+                    <div>
+                        <h3>Heating Light</h3>
+                        <div class="sub">Thermal relay</div>
+                    </div>
+                </div>
+                <span id="light-status" class="status-pill off">OFF</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ CHART: FULL TELEMETRY ============ -->
+    <h2 class="section-title">Historical Trends</h2>
+    <div class="chart-panel">
+        <div class="panel-head">
+            <h2>📈 Climate &amp; Growth History</h2>
+            <span class="hint">Last 50 records · updates every 10s</span>
+        </div>
+        <canvas id="telemetryChart" height="110"></canvas>
+    </div>
+
+    <div class="chart-row">
+        <div class="chart-panel">
+            <div class="panel-head">
+                <h2>🌡️ Temperature &amp; Humidity</h2>
+                <span class="hint">Dual axis</span>
+            </div>
+            <canvas id="thChart" height="130"></canvas>
+        </div>
+        <div class="chart-panel">
+            <div class="panel-head">
+                <h2>🌱 Growth Trajectory</h2>
+                <span class="hint">Plant height (cm)</span>
+            </div>
+            <canvas id="heightChart" height="130"></canvas>
+        </div>
+    </div>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="farm-footer">
+        <div class="divider"></div>
+        Mung Bean Monitor · Powered by Blynk &amp; Flask · Data logged to SQLite
+    </footer>
+
+</div>
+
+<script>
+    const POLL_MS = 1000;          // dashboard refresh
+    const CHART_PUSH_MS = 10000;   // chart point push interval
+    let lastChartPush = 0;
+
+    // Soil ADC reference for the gauge (adjust if your sensor differs)
+    const SOIL_ADC_MIN = 0;
+    const SOIL_ADC_MAX = 4095;
+
+    // ---------- Chart.js global theme ----------
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.color = '#4a5a50';
+    Chart.defaults.plugins.legend.labels.usePointStyle = true;
+    Chart.defaults.plugins.legend.labels.boxWidth = 8;
+    Chart.defaults.plugins.legend.labels.padding = 14;
+
+    const gridColor = 'rgba(45,106,79,0.08)';
+
+    // ---------- Main telemetry chart ----------
+    const ctx = document.getElementById('telemetryChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Temperature (°C)',
+                    borderColor: '#f4a261',
+                    backgroundColor: 'rgba(244,162,97,0.08)',
+                    data: [], fill: true, tension: 0.35,
+                    pointRadius: 2, pointHoverRadius: 5,
+                    borderWidth: 2.5
+                },
+                {
+                    label: 'Humidity (%)',
+                    borderColor: '#457b9d',
+                    backgroundColor: 'rgba(69,123,157,0.08)',
+                    data: [], fill: true, tension: 0.35,
+                    pointRadius: 2, pointHoverRadius: 5,
+                    borderWidth: 2.5
+                },
+                {
+                    label: 'Plant Height (cm)',
+                    borderColor: '#40916c',
+                    backgroundColor: 'rgba(64,145,108,0.08)',
+                    data: [], fill: true, tension: 0.35,
+                    pointRadius: 2, pointHoverRadius: 5,
+                    borderWidth: 2.5
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top', align: 'end' },
+                tooltip: {
+                    backgroundColor: 'rgba(27,67,50,0.95)',
+                    padding: 12,
+                    cornerRadius: 8,
+                    titleColor: '#d8f3dc',
+                    bodyColor: '#f1faee'
+                }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Time', color: '#7a8a7e' },
+                    grid: { color: gridColor },
+                    ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 }
+                },
+                y: {
+                    title: { display: true, text: 'Value', color: '#7a8a7e' },
+                    grid: { color: gridColor },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // ---------- Temperature & Humidity dual-axis chart ----------
+    const thCtx = document.getElementById('thChart').getContext('2d');
+    const thChart = new Chart(thCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Temp (°C)',
+                    borderColor: '#f4a261',
+                    backgroundColor: 'rgba(244,162,97,0.15)',
+                    data: [], fill: true, tension: 0.35,
+                    pointRadius: 2, yAxisID: 'y',
+                    borderWidth: 2.5
+                },
+                {
+                    label: 'Humidity (%)',
+                    borderColor: '#457b9d',
+                    backgroundColor: 'rgba(69,123,157,0.15)',
+                    data: [], fill: true, tension: 0.35,
+                    pointRadius: 2, yAxisID: 'y1',
+                    borderWidth: 2.5
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top', align: 'end' },
+                tooltip: { backgroundColor: 'rgba(27,67,50,0.95)', padding: 10, cornerRadius: 8 }
+            },
+            scales: {
+                x: { grid: { color: gridColor }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 6 } },
+                y: {
+                    type: 'linear', position: 'left',
+                    title: { display: true, text: '°C', color: '#f4a261' },
+                    grid: { color: gridColor },
+                    ticks: { color: '#c1440e' }
+                },
+                y1: {
+                    type: 'linear', position: 'right',
+                    title: { display: true, text: '%', color: '#457b9d' },
+                    grid: { drawOnChartArea: false },
+                    ticks: { color: '#2a6f97' },
+                    min: 0, max: 100
+                }
+            }
+        }
+    });
+
+    // ---------- Plant height chart ----------
+    const hCtx = document.getElementById('heightChart').getContext('2d');
+    const heightChart = new Chart(hCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Height (cm)',
+                borderColor: '#2d6a4f',
+                backgroundColor: 'rgba(64,145,108,0.15)',
+                data: [], fill: true, tension: 0.35,
+                pointRadius: 2.5, pointHoverRadius: 6,
+                borderWidth: 2.5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: { backgroundColor: 'rgba(27,67,50,0.95)', padding: 10, cornerRadius: 8 }
+            },
+            scales: {
+                x: { grid: { color: gridColor }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 6 } },
+                y: {
+                    title: { display: true, text: 'cm', color: '#40916c' },
+                    grid: { color: gridColor },
+                    ticks: { color: '#2d6a4f' },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // ---------- Load SQLite history ----------
+    async function loadHistory() {
+        try {
+            const res = await fetch('/api/history');
+            const history = await res.json();
+
+            history.forEach(item => {
+                const label = item.timestamp.split(" ")[1] || item.timestamp;
+                chart.data.labels.push(label);
+                chart.data.datasets[0].data.push(item.temp);
+                chart.data.datasets[1].data.push(item.humidity);
+                chart.data.datasets[2].data.push(item.height);
+
+                thChart.data.labels.push(label);
+                thChart.data.datasets[0].data.push(item.temp);
+                thChart.data.datasets[1].data.push(item.humidity);
+
+                heightChart.data.labels.push(label);
+                heightChart.data.datasets[0].data.push(item.height);
+            });
+            chart.update();
+            thChart.update();
+            heightChart.update();
+        } catch (err) {
+            console.error("Failed to load historical data:", err);
+        }
+    }
+
+    // ---------- Status UI ----------
+    function setConnectionUI(online, updated, status, statusMessage) {
+        const dot = document.getElementById('iotDot');
+        const label = document.getElementById('iotStatusLabel');
+        const lastSeen = document.getElementById('iotLastSeen');
+
+        let cls = 'iot-dot ';
+        if (status === 'online') cls += 'online';
+        else if (status === 'checking') cls += '';
+        else cls += 'offline';
+        dot.className = cls;
+
+        label.innerText = statusMessage || (online ? 'IoT Device Online' : 'IoT Device Offline');
+
+        if (status === 'online') {
+            lastSeen.innerText = '⏱ live';
+        } else if (updated) {
+            lastSeen.innerText = `⏱ last: ${updated}`;
+        } else {
+            lastSeen.innerText = '';
+        }
+
+        document.body.classList.toggle('device-offline', !online);
+    }
+
+    // ---------- Relay UI ----------
+    function updateRelayUI(elementId, state) {
+        const el = document.getElementById(elementId);
+        if (state === 1) {
+            el.innerText = "ON";
+            el.className = "status-pill on";
+        } else {
+            el.innerText = "OFF";
+            el.className = "status-pill off";
+        }
+    }
+
+    // ---------- Soil moisture gauge ----------
+    function updateSoilGauge(raw) {
+        const pct = Math.max(0, Math.min(100, ((raw - SOIL_ADC_MIN) / (SOIL_ADC_MAX - SOIL_ADC_MIN)) * 100));
+        const circumference = 2 * Math.PI * 58; // 364.4
+        const offset = circumference - (pct / 100) * circumference;
+        const gauge = document.getElementById('moistureGauge');
+        gauge.style.strokeDashoffset = offset;
+
+        // colour: dry -> red, moderate -> wheat, optimal -> green
+        let colour = '#40916c';
+        let label = 'Optimal';
+        if (pct < 30) { colour = '#bc4749'; label = 'Dry'; }
+        else if (pct < 60) { colour = '#e9c46a'; label = 'Moderate'; }
+        gauge.style.stroke = colour;
+
+        document.getElementById('gaugeNum').innerText = raw;
+        document.getElementById('gaugeLabel').innerText = label;
+    }
+
+    // ---------- Alert strip ----------
+    function updateAlerts(data) {
+        const strip = document.getElementById('alertStrip');
+        const text = document.getElementById('alertText');
+        let msg = null;
+
+        if (!data.online && data.status === 'cloud_error') {
+            msg = "Cannot reach the Blynk cloud — check internet connectivity.";
+        } else if (!data.online && data.status === 'offline') {
+            msg = "The IoT device is offline. Last known readings are shown (relays forced OFF).";
+        } else if (data.online) {
+            if (data.temp > 40) msg = `High temperature detected: ${data.temp.toFixed(1)} °C — cooling may be required.`;
+            else if (data.temp < 10) msg = `Low temperature detected: ${data.temp.toFixed(1)} °C — consider heating.`;
+            else if (data.humidity < 30) msg = `Low humidity: ${data.humidity.toFixed(1)} % — consider misting.`;
+        }
+
+        if (msg) {
+            text.innerText = msg;
+            strip.classList.add('show');
+        } else {
+            strip.classList.remove('show');
+        }
+    }
+
+    // ---------- Main update ----------
+    async function updateDashboard() {
+        try {
+            const res = await fetch('/api/data');
+            const data = await res.json();
+
+            setConnectionUI(data.online, data.updated, data.status, data.status_message);
+
+            document.getElementById('temp').innerText = data.temp.toFixed(1);
+            document.getElementById('humidity').innerText = data.humidity.toFixed(1);
+            document.getElementById('moisture').innerText = data.moisture;
+            document.getElementById('height').innerText = data.height.toFixed(1);
+
+            document.getElementById('iotTemp').innerText = data.temp.toFixed(1);
+            document.getElementById('iotHum').innerText = data.humidity.toFixed(1);
+            document.getElementById('iotMoist').innerText = data.moisture;
+
+            updateRelayUI('pump-status', data.pump);
+            updateRelayUI('fan-status', data.fan);
+            updateRelayUI('light-status', data.light);
+
+            updateSoilGauge(data.moisture);
+            updateAlerts(data);
+
+            // Push live point to charts
+            const nowMs = Date.now();
+            if (data.online && nowMs - lastChartPush >= CHART_PUSH_MS) {
+                lastChartPush = nowMs;
+                const label = new Date().toLocaleTimeString();
+
+                const trim = (c) => {
+                    if (c.data.labels.length > 50) {
+                        c.data.labels.shift();
+                        c.data.datasets.forEach(d => d.data.shift());
+                    }
+                };
+
+                trim(chart);
+                chart.data.labels.push(label);
+                chart.data.datasets[0].data.push(data.temp);
+                chart.data.datasets[1].data.push(data.humidity);
+                chart.data.datasets[2].data.push(data.height);
+                chart.update('none');
+
+                trim(thChart);
+                thChart.data.labels.push(label);
+                thChart.data.datasets[0].data.push(data.temp);
+                thChart.data.datasets[1].data.push(data.humidity);
+                thChart.update('none');
+
+                trim(heightChart);
+                heightChart.data.labels.push(label);
+                heightChart.data.datasets[0].data.push(data.height);
+                heightChart.update('none');
+            }
+        } catch (err) {
+            console.error("Failed to fetch dashboard data:", err);
+            setConnectionUI(false, null, 'cloud_error', 'Cannot reach server');
+            document.getElementById('iotTemp').innerText = '--';
+            document.getElementById('iotHum').innerText = '--';
+            document.getElementById('iotMoist').innerText = '--';
+        }
+    }
+
+    // ---------- Init ----------
+    loadHistory();
+    updateDashboard();
+    setInterval(updateDashboard, POLL_MS);
+</script>
+</body>
+</html>
