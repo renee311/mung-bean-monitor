@@ -14,10 +14,6 @@ from urllib3.util.retry import Retry
 app = Flask(__name__)
 
 
-# ------------------------------------------------------------------
-# Logging helper — flushes immediately so Render's log viewer shows
-# output from daemon threads.
-# ------------------------------------------------------------------
 def log(*args):
     try:
         print(*args, flush=True)
@@ -31,28 +27,22 @@ def log(*args):
 # ------------------------------------------------------------------
 BLYNK_AUTH_TOKEN = os.environ.get("BLYNK_AUTH_TOKEN")
 if not BLYNK_AUTH_TOKEN:
-    raise ValueError(
-        "BLYNK_AUTH_TOKEN environment variable is required. "
-        "Set it in your Render dashboard before starting the app."
-    )
+    raise ValueError("BLYNK_AUTH_TOKEN environment variable is required.")
 
 BLYNK_SERVER = "https://blynk.cloud/external/api"
 
 
 # ------------------------------------------------------------------
-# Database configuration
+# Database & intervals
 # ------------------------------------------------------------------
 DB_NAME = os.environ.get("DB_PATH", "mung_bean_history.db")
 _db_dir = os.path.dirname(DB_NAME)
 if _db_dir and not os.path.exists(_db_dir):
     os.makedirs(_db_dir, exist_ok=True)
 
-POLL_INTERVAL = 1.0     # poller reads Blynk every 1 s
-LOG_INTERVAL  = 10.0    # SQLite insert every 10 s
-
-# How many consecutive offline readings before we declare "device offline".
-# At 1 Hz this = 15 seconds. A single missed heartbeat is ignored.
-OFFLINE_THRESHOLD = 15
+POLL_INTERVAL     = 1.0    # Blynk poll every 1 s
+LOG_INTERVAL      = 10.0   # SQLite insert every 10 s
+OFFLINE_THRESHOLD = 15     # consecutive offline reads before "offline"
 
 VIRTUAL_PINS = {
     "temp":     "V0",
@@ -65,15 +55,9 @@ VIRTUAL_PINS = {
 }
 
 latest_data = {
-    "temp": 0.0,
-    "humidity": 0.0,
-    "moisture": 0,
-    "height": 0.0,
-    "pump": 0,
-    "fan": 0,
-    "light": 0,
-    "online": False,
-    "cloud_ok": False,
+    "temp": 0.0, "humidity": 0.0, "moisture": 0, "height": 0.0,
+    "pump": 0, "fan": 0, "light": 0,
+    "online": False, "cloud_ok": False,
     "updated": None,
     "status": "checking",
     "status_message": "Initializing...",
@@ -82,26 +66,23 @@ data_lock = threading.Lock()
 
 
 # ------------------------------------------------------------------
-# HTTP sessions — one per thread role
+# HTTP sessions
 # ------------------------------------------------------------------
 def make_session():
     s = requests.Session()
-    retry = Retry(
-        total=3,
-        backoff_factor=0.5,
-        status_forcelist=[500, 502, 503, 504],
-        allowed_methods=["GET"],
-    )
+    retry = Retry(total=3, backoff_factor=0.5,
+                  status_forcelist=[500, 502, 503, 504],
+                  allowed_methods=["GET"])
     s.mount("https://", HTTPAdapter(max_retries=retry))
     return s
 
 
-_session        = make_session()   # used by Flask route handlers
-_poller_session = make_session()   # used exclusively by the poller thread
+_session        = make_session()
+_poller_session = make_session()
 
 
 # ------------------------------------------------------------------
-# Database helpers
+# Database
 # ------------------------------------------------------------------
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -162,12 +143,6 @@ def fetch_blynk_pins(pins, session=None):
 
 
 def fetch_device_online(session=None):
-    """
-    Returns:
-        True  -> hardware connected
-        False -> hardware not connected
-        None  -> cloud unreachable or unexpected error
-    """
     s = session or _session
     url = f"{BLYNK_SERVER}/isHardwareConnected?token={BLYNK_AUTH_TOKEN}"
     try:
@@ -176,7 +151,7 @@ def fetch_device_online(session=None):
             return r.text.strip().lower() == "true"
         if r.status_code in (400, 404):
             return False
-        log(f"[blynk] isHardwareConnected HTTP {r.status_code}: {r.text[:150]}")
+        log(f"[blynk] isHardwareConnected HTTP {r.status_code}")
         return None
     except Exception as e:
         log(f"[blynk] isHardwareConnected exception: {type(e).__name__}: {e}")
@@ -184,7 +159,7 @@ def fetch_device_online(session=None):
 
 
 # ------------------------------------------------------------------
-# Background poller
+# Background poller (backup path)
 # ------------------------------------------------------------------
 _poller_thread        = None
 _poller_started_at    = None
@@ -195,9 +170,7 @@ _offline_streak       = 0
 
 
 def poller_loop():
-    global _poller_cycles, _poller_last_error, _poller_last_cycle_at
-    global _offline_streak
-
+    global _poller_cycles, _poller_last_error, _poller_last_cycle_at, _offline_streak
     log(f"[poller] thread started, pid={os.getpid()}")
     last_log = 0.0
 
@@ -205,25 +178,20 @@ def poller_loop():
         _poller_cycles += 1
         try:
             started = time.time()
-
-            values = fetch_blynk_pins(
-                list(VIRTUAL_PINS.values()), session=_poller_session
-            )
+            values = fetch_blynk_pins(list(VIRTUAL_PINS.values()),
+                                     session=_poller_session)
             device_online = fetch_device_online(session=_poller_session)
 
-            # ---- Debounce the offline signal ----
             if device_online is True:
                 _offline_streak = 0
             elif device_online is False:
                 _offline_streak += 1
-            # None → don't touch streak (transient cloud error)
 
             confirmed_offline = _offline_streak >= OFFLINE_THRESHOLD
 
             with data_lock:
-                # Always refresh numeric values when we got them.
-                # Blynk keeps the last known values even when the
-                # ESP32 goes silent, so this stays meaningful.
+                # Only update from Blynk if the /ingest path hasn't
+                # written something more recent.
                 if values is not None:
                     latest_data.update({
                         "temp":     values[VIRTUAL_PINS["temp"]],
@@ -238,26 +206,20 @@ def poller_loop():
                     })
 
                 if device_online is None and _offline_streak == 0:
-                    # Hard cloud error (couldn't reach Blynk at all)
                     latest_data.update({
-                        "online": False,
-                        "cloud_ok": False,
+                        "online": False, "cloud_ok": False,
                         "status": "cloud_error",
                         "status_message": "Cannot reach Blynk cloud",
                     })
                 elif confirmed_offline:
-                    # Real, sustained outage. Keep last known relay
-                    # state — the ESP32 handles its own failsafe.
                     latest_data.update({
                         "online": False,
                         "status": "offline",
                         "status_message": "Device not connected",
                     })
                 else:
-                    # Device fine, OR brief blip — treat as online.
                     latest_data.update({
-                        "online": True,
-                        "cloud_ok": True,
+                        "online": True, "cloud_ok": True,
                         "status": "online",
                         "status_message": "All systems normal",
                     })
@@ -271,15 +233,11 @@ def poller_loop():
                 last_log = time.time()
 
             if _poller_cycles % 30 == 0:
-                log(
-                    f"[poller] cycles={_poller_cycles} "
+                log(f"[poller] cycles={_poller_cycles} "
                     f"online={snapshot['online']} "
                     f"streak={_offline_streak} "
                     f"temp={snapshot['temp']:.2f} "
-                    f"hum={snapshot['humidity']:.1f} "
-                    f"moist={snapshot['moisture']} "
-                    f"updated={snapshot['updated']}"
-                )
+                    f"updated={snapshot['updated']}")
 
             elapsed = time.time() - started
             time.sleep(max(0.0, POLL_INTERVAL - elapsed))
@@ -344,13 +302,8 @@ def get_history():
 
 @app.route("/ingest", methods=["POST"])
 def ingest():
-    """ESP32 posts sensor data here for instant dashboard updates.
-
-    Body example:
-        {"temp": 26.1, "humidity": 58.0, "moisture": 2403,
-         "height": 8.6, "pump": 0, "fan": 1, "light": 0}
-    Any subset of keys is accepted.
-    """
+    """ESP32 posts here for instant dashboard updates."""
+    global _offline_streak
     data = request.get_json(silent=True) or {}
     try:
         with data_lock:
@@ -366,11 +319,8 @@ def ingest():
             latest_data["status"]         = "online"
             latest_data["status_message"] = "All systems normal"
             latest_data["updated"]        = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        # Reset the offline debounce since we just heard from the device.
-        global _offline_streak
         _offline_streak = 0
-
+        log(f"[ingest] received {data}")
     except (TypeError, ValueError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     return jsonify({"ok": True})
@@ -380,24 +330,22 @@ def ingest():
 def debug_info():
     ensure_poller_alive()
     info = {
-        "python":              platform.python_version(),
-        "token_set":           bool(BLYNK_AUTH_TOKEN),
-        "token_prefix":        BLYNK_AUTH_TOKEN[:6] + "..." if BLYNK_AUTH_TOKEN else None,
-        "blynk_server":        BLYNK_SERVER,
-        "db_path":             DB_NAME,
-        "poll_interval":       POLL_INTERVAL,
-        "log_interval":        LOG_INTERVAL,
-        "offline_threshold":   OFFLINE_THRESHOLD,
-        "offline_streak":      _offline_streak,
-        # --- Poller health ---
-        "poller_alive":        _poller_thread.is_alive() if _poller_thread else False,
-        "poller_cycles":       _poller_cycles,
-        "poller_started_at":   _poller_started_at,
-        "poller_last_cycle":   _poller_last_cycle_at,
-        "poller_last_error":   _poller_last_error,
-        "poller_pid":          os.getpid(),
+        "python":            platform.python_version(),
+        "token_set":         bool(BLYNK_AUTH_TOKEN),
+        "token_prefix":      BLYNK_AUTH_TOKEN[:6] + "..." if BLYNK_AUTH_TOKEN else None,
+        "blynk_server":      BLYNK_SERVER,
+        "db_path":           DB_NAME,
+        "poll_interval":     POLL_INTERVAL,
+        "log_interval":      LOG_INTERVAL,
+        "offline_threshold": OFFLINE_THRESHOLD,
+        "offline_streak":    _offline_streak,
+        "poller_alive":      _poller_thread.is_alive() if _poller_thread else False,
+        "poller_cycles":     _poller_cycles,
+        "poller_started_at": _poller_started_at,
+        "poller_last_cycle": _poller_last_cycle_at,
+        "poller_last_error": _poller_last_error,
+        "poller_pid":        os.getpid(),
     }
-
     url = f"{BLYNK_SERVER}/isHardwareConnected?token={BLYNK_AUTH_TOKEN}"
     try:
         r = requests.get(url, timeout=10)
@@ -405,7 +353,6 @@ def debug_info():
         info["blynk_body"] = r.text[:200]
     except Exception as e:
         info["blynk_error"] = f"{type(e).__name__}: {e}"
-
     try:
         pins = list(VIRTUAL_PINS.values())
         purl = f"{BLYNK_SERVER}/get?token={BLYNK_AUTH_TOKEN}&" + "&".join(pins)
@@ -414,10 +361,8 @@ def debug_info():
         info["pins_body"] = pr.text[:300]
     except Exception as e:
         info["pins_error"] = f"{type(e).__name__}: {e}"
-
     with data_lock:
         info["latest_data"] = dict(latest_data)
-
     return jsonify(info)
 
 
@@ -427,9 +372,6 @@ def healthz():
     return jsonify({"ok": True})
 
 
-# ------------------------------------------------------------------
-# No-cache headers
-# ------------------------------------------------------------------
 @app.after_request
 def add_no_cache_headers(resp):
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
