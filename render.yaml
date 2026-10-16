@@ -1,0 +1,16 @@
+services:                        # Top-level: a list of services to create
+  - type: web                    # 1st item: a web service
+    name: mung-bean-dashboard    # Display name in Render
+    runtime: python              # Which language runtime to use
+    plan: free                   # Which pricing tier
+    branch: main                 # Which Git branch to deploy from
+    buildCommand: pip install -r requirements.txt   # Run during build
+    startCommand: gunicorn --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT mung:app
+    healthCheckPath: /healthz    # URL Render pings to check the app is alive
+    envVars:                     # A list of environment variables
+      - key: BLYNK_AUTH_TOKEN
+        sync: false              # You'll set the value manually in the dashboard
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: START_POLLER
+        value: "1"

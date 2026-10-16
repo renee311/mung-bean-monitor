@@ -11,11 +11,31 @@ from urllib3.util.retry import Retry
 app = Flask(__name__)
 
 # ------------------------------------------------------------------
-# Blynk Configuration
+# Blynk Configuration (SECURE — read from environment)
 # ------------------------------------------------------------------
-BLYNK_AUTH_TOKEN = os.environ.get("BLYNK_AUTH_TOKEN", "auWNqgLcgtwQ6lQCbhQzCJbeoANRG3KF")
+BLYNK_AUTH_TOKEN = os.environ.get("BLYNK_AUTH_TOKEN")
+
+# Fail fast if the token is missing — do NOT fall back to a hardcoded value.
+if not BLYNK_AUTH_TOKEN:
+    raise ValueError(
+        "BLYNK_AUTH_TOKEN environment variable is required. "
+        "Set it in your Render dashboard (or local shell) before starting the app."
+    )
+
 BLYNK_SERVER = "https://blynk.cloud/external/api"
-DB_NAME = "mung_bean_history.db"
+
+# ------------------------------------------------------------------
+# Database path
+# ------------------------------------------------------------------
+# On Render with a persistent disk mounted at /var/data, set
+#   DB_PATH=/var/data/mung_bean_history.db
+# Otherwise, it falls back to a local file (which resets on redeploy).
+DB_NAME = os.environ.get("DB_PATH", "mung_bean_history.db")
+
+# Ensure the parent directory exists (important when using a mounted disk)
+_db_dir = os.path.dirname(DB_NAME)
+if _db_dir and not os.path.exists(_db_dir):
+    os.makedirs(_db_dir, exist_ok=True)
 
 POLL_INTERVAL = 1.0     # backend reads Blynk every 1 s
 LOG_INTERVAL  = 10.0    # SQLite insert every 10 s
@@ -221,6 +241,7 @@ def debug_info():
         "token_set": bool(BLYNK_AUTH_TOKEN),
         "token_prefix": BLYNK_AUTH_TOKEN[:6] + "..." if BLYNK_AUTH_TOKEN else None,
         "blynk_server": BLYNK_SERVER,
+        "db_path": DB_NAME,
     }
     # Try a direct Blynk call
     url = f"{BLYNK_SERVER}/isHardwareConnected?token={BLYNK_AUTH_TOKEN}"
@@ -236,16 +257,21 @@ def debug_info():
     return jsonify(info)
 
 
+@app.route("/healthz")
+def healthz():
+    """Lightweight health check for Render."""
+    return jsonify({"ok": True})
+
+
 # ------------------------------------------------------------------
 # Startup — runs both locally AND under gunicorn
 # ------------------------------------------------------------------
 print("[startup] mung.py loaded, __name__ =", __name__)
 init_db()
-print("[startup] database ready")
+print("[startup] database ready at", DB_NAME)
 
-# Start the poller exactly once, whether running via `python mung.py`
-# or `gunicorn mung:app`. The START_POLLER env guard prevents
-# duplicate threads if gunicorn spawns multiple workers.
+# Start the poller exactly once. IMPORTANT: run gunicorn with --workers 1
+# so this guard is enough. With multiple workers you'd get duplicate pollers.
 if os.environ.get("START_POLLER", "1") == "1":
     threading.Thread(target=poller, daemon=True, name="blynk-poller").start()
     os.environ["START_POLLER"] = "0"
