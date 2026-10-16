@@ -4,6 +4,7 @@ import sqlite3
 import threading
 import time
 import os
+import sys
 from datetime import datetime
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -11,11 +12,23 @@ from urllib3.util.retry import Retry
 app = Flask(__name__)
 
 # ------------------------------------------------------------------
+# Logging helper — forces flush so Render's log viewer shows output
+# from daemon threads. Without flush=True, print() in a thread often
+# buffers and never appears in the Render log stream.
+# ------------------------------------------------------------------
+def log(*args):
+    try:
+        print(*args, flush=True)
+        sys.stdout.flush()
+    except Exception:
+        pass
+
+
+# ------------------------------------------------------------------
 # Blynk Configuration (SECURE — read from environment)
 # ------------------------------------------------------------------
 BLYNK_AUTH_TOKEN = os.environ.get("BLYNK_AUTH_TOKEN")
 
-# Fail fast if the token is missing — do NOT fall back to a hardcoded value.
 if not BLYNK_AUTH_TOKEN:
     raise ValueError(
         "BLYNK_AUTH_TOKEN environment variable is required. "
@@ -27,12 +40,8 @@ BLYNK_SERVER = "https://blynk.cloud/external/api"
 # ------------------------------------------------------------------
 # Database path
 # ------------------------------------------------------------------
-# On Render with a persistent disk mounted at /var/data, set
-#   DB_PATH=/var/data/mung_bean_history.db
-# Otherwise, it falls back to a local file (which resets on redeploy).
 DB_NAME = os.environ.get("DB_PATH", "mung_bean_history.db")
 
-# Ensure the parent directory exists (important when using a mounted disk)
 _db_dir = os.path.dirname(DB_NAME)
 if _db_dir and not os.path.exists(_db_dir):
     os.makedirs(_db_dir, exist_ok=True)
@@ -110,38 +119,54 @@ def log_to_db(data):
         conn.commit()
         conn.close()
     except Exception as e:
-        print(f"Database insertion error: {e}")
+        log(f"[db] insertion error: {e}")
 
 
 # ------------------------------------------------------------------
 # Blynk helpers
 # ------------------------------------------------------------------
 def fetch_blynk_pins(pins):
+    """
+    Fetch multiple virtual pins in one call.
+    Blynk returns JSON like {"V0": 24.6, "V1": 67.2, ...}.
+    Returns a dict {pin: float} or None on hard failure.
+    """
     url = f"{BLYNK_SERVER}/get?token={BLYNK_AUTH_TOKEN}&" + "&".join(pins)
     try:
         r = _session.get(url, timeout=(3, 6))
         if r.status_code != 200:
-            print(f"Blynk returned HTTP {r.status_code}: {r.text[:120]}")
+            log(f"[blynk] /get HTTP {r.status_code}: {r.text[:150]}")
             return None
         raw = r.json()
+        # Normalise non-dict responses (single pin returns a scalar)
         if not isinstance(raw, dict):
             raw = {pins[0]: raw}
-        return {p: float(raw.get(p, 0)) for p in pins}
+        return {p: float(raw.get(p, 0) or 0) for p in pins}
     except Exception as e:
-        print(f"Error fetching pins: {e}")
+        log(f"[blynk] /get exception: {type(e).__name__}: {e}")
         return None
 
 
 def fetch_device_online():
+    """
+    Returns:
+        True  -> hardware is connected
+        False -> hardware is NOT connected (normal offline state)
+        None  -> cloud unreachable / unexpected error
+    """
     url = f"{BLYNK_SERVER}/isHardwareConnected?token={BLYNK_AUTH_TOKEN}"
     try:
         r = _session.get(url, timeout=(3, 6))
-        if r.status_code != 200:
-            print(f"Blynk (isHardwareConnected) HTTP {r.status_code}: {r.text[:120]}")
-            return None
-        return r.text.strip().lower() == "true"
+        if r.status_code == 200:
+            return r.text.strip().lower() == "true"
+        # Blynk returns 400/404 when the device has never been connected.
+        # That is NOT a cloud error — treat it as "device offline".
+        if r.status_code in (400, 404):
+            return False
+        log(f"[blynk] isHardwareConnected HTTP {r.status_code}: {r.text[:150]}")
+        return None
     except Exception as e:
-        print(f"Error checking device status: {e}")
+        log(f"[blynk] isHardwareConnected exception: {type(e).__name__}: {e}")
         return None
 
 
@@ -149,29 +174,24 @@ def fetch_device_online():
 # Background poller
 # ------------------------------------------------------------------
 def poller():
-    print("[poller] thread started")
+    log("[poller] thread started")
     last_log = 0.0
+    cycle = 0
+
     while True:
+        cycle += 1
         try:
             started = time.time()
+
+            # Always try to fetch values — Blynk keeps the last known
+            # values even when the hardware is offline, which is what
+            # we want to display alongside the offline badge.
+            values = fetch_blynk_pins(list(VIRTUAL_PINS.values()))
             device_online = fetch_device_online()
-            values = fetch_blynk_pins(list(VIRTUAL_PINS.values())) if device_online else None
 
             with data_lock:
-                if device_online is None or (device_online and values is None):
-                    latest_data["cloud_ok"] = False
-                    latest_data["online"] = False
-                    latest_data["status"] = "cloud_error"
-                    latest_data["status_message"] = "Cannot reach Blynk cloud"
-                elif not device_online:
-                    latest_data.update({
-                        "pump": 0, "fan": 0, "light": 0,
-                        "online": False,
-                        "cloud_ok": True,
-                        "status": "offline",
-                        "status_message": "Device not connected",
-                    })
-                else:
+                # 1) Update numeric values from Blynk (if we got them)
+                if values is not None:
                     latest_data.update({
                         "temp":     values[VIRTUAL_PINS["temp"]],
                         "humidity": values[VIRTUAL_PINS["humidity"]],
@@ -180,24 +200,55 @@ def poller():
                         "pump":     int(values[VIRTUAL_PINS["pump"]]),
                         "fan":      int(values[VIRTUAL_PINS["fan"]]),
                         "light":    int(values[VIRTUAL_PINS["light"]]),
-                        "online": True,
+                        "updated":  datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         "cloud_ok": True,
-                        "updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    })
+
+                # 2) Update device status flags
+                if device_online is True:
+                    latest_data.update({
+                        "online": True,
                         "status": "online",
                         "status_message": "All systems normal",
                     })
+                elif device_online is False:
+                    latest_data.update({
+                        "online": False,
+                        "status": "offline",
+                        "status_message": "Device not connected",
+                    })
+                else:
+                    # None -> could not reach Blynk at all
+                    latest_data.update({
+                        "online": False,
+                        "cloud_ok": False,
+                        "status": "cloud_error",
+                        "status_message": "Cannot reach Blynk cloud",
+                    })
+
                 snapshot = dict(latest_data)
 
-            if snapshot["online"] and time.time() - last_log >= LOG_INTERVAL:
+            # 3) Persist to DB at a slower cadence
+            if snapshot["cloud_ok"] and time.time() - last_log >= LOG_INTERVAL:
                 log_to_db(snapshot)
                 last_log = time.time()
+
+            # 4) Periodic diagnostic line so we can see the loop is alive
+            if cycle % 30 == 0:
+                log(
+                    f"[poller] cycle={cycle} "
+                    f"online={snapshot['online']} "
+                    f"cloud_ok={snapshot['cloud_ok']} "
+                    f"temp={snapshot['temp']} "
+                    f"hum={snapshot['humidity']} "
+                    f"moist={snapshot['moisture']}"
+                )
 
             elapsed = time.time() - started
             time.sleep(max(0.0, POLL_INTERVAL - elapsed))
 
         except Exception as e:
-            # Never let the poller thread die — keep it alive no matter what
-            print(f"[poller] unexpected error: {e}")
+            log(f"[poller] unexpected error: {type(e).__name__}: {e}")
             time.sleep(1.0)
 
 
@@ -234,7 +285,7 @@ def get_history():
 
 @app.route("/api/debug")
 def debug_info():
-    """Temporary endpoint for diagnosing connectivity."""
+    """Diagnostic endpoint — visit this URL when things look frozen."""
     import platform
     info = {
         "python": platform.python_version(),
@@ -242,42 +293,56 @@ def debug_info():
         "token_prefix": BLYNK_AUTH_TOKEN[:6] + "..." if BLYNK_AUTH_TOKEN else None,
         "blynk_server": BLYNK_SERVER,
         "db_path": DB_NAME,
+        "poll_interval": POLL_INTERVAL,
+        "log_interval": LOG_INTERVAL,
     }
-    # Try a direct Blynk call
+
+    # Direct, un-cached Blynk call
     url = f"{BLYNK_SERVER}/isHardwareConnected?token={BLYNK_AUTH_TOKEN}"
     try:
         r = requests.get(url, timeout=10)
         info["blynk_status_code"] = r.status_code
         info["blynk_body"] = r.text[:200]
     except Exception as e:
-        info["blynk_error"] = str(e)
+        info["blynk_error"] = f"{type(e).__name__}: {e}"
+
+    # Direct pin fetch too
+    try:
+        pins = list(VIRTUAL_PINS.values())
+        purl = f"{BLYNK_SERVER}/get?token={BLYNK_AUTH_TOKEN}&" + "&".join(pins)
+        pr = requests.get(purl, timeout=10)
+        info["pins_status_code"] = pr.status_code
+        info["pins_body"] = pr.text[:300]
+    except Exception as e:
+        info["pins_error"] = f"{type(e).__name__}: {e}"
 
     with data_lock:
         info["latest_data"] = dict(latest_data)
+
     return jsonify(info)
 
 
 @app.route("/healthz")
 def healthz():
-    """Lightweight health check for Render."""
     return jsonify({"ok": True})
 
 
 # ------------------------------------------------------------------
 # Startup — runs both locally AND under gunicorn
 # ------------------------------------------------------------------
-print("[startup] mung.py loaded, __name__ =", __name__)
+log("[startup] mung.py loaded, __name__ =", __name__)
 init_db()
-print("[startup] database ready at", DB_NAME)
+log("[startup] database ready at", DB_NAME)
 
-# Start the poller exactly once. IMPORTANT: run gunicorn with --workers 1
-# so this guard is enough. With multiple workers you'd get duplicate pollers.
+# Start the poller exactly once. Run gunicorn with --workers 1
+# so this guard is sufficient (Render does this by default).
 if os.environ.get("START_POLLER", "1") == "1":
     threading.Thread(target=poller, daemon=True, name="blynk-poller").start()
     os.environ["START_POLLER"] = "0"
-    print("[startup] poller thread launched")
+    log("[startup] poller thread launched")
 else:
-    print("[startup] poller already running in another worker, skipping")
+    log("[startup] poller already running in another worker, skipping")
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
