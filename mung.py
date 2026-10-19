@@ -72,8 +72,10 @@ def dashboard():
         fan_str = "ON" if fan == 1 else "OFF"
         light_str = "ON" if light == 1 else "OFF"
     else:
-        ts, temp, hum, soil, height = "Waiting for ESP32...", "--", "--", "--", "--"
-        pump_str, fan_str, light_str = "OFF", "OFF", "OFF"
+        ts = "Waiting for ESP32..."
+        temp = hum = soil = height = "--"
+        pump = fan = light = 0
+        pump_str = fan_str = light_str = "OFF"
 
     html = f'''
     <!DOCTYPE html>
@@ -96,12 +98,12 @@ def dashboard():
     <body>
         <h1>🌱 Mung Bean Enclosure Live Server</h1>
         <p class="label">LAST UPDATED: {ts}</p>
-        
+
         <div class="card">
             <div class="label">TEMPERATURE</div>
             <div class="value">{temp} °C</div>
         </div>
-        
+
         <div class="card">
             <div class="label">HUMIDITY</div>
             <div class="value">{hum} %</div>
