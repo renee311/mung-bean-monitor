@@ -27,7 +27,9 @@ def init_db():
 
 init_db()
 
-# --- ESP32 Data Receiver ---
+# ==========================================
+# ESP32 TELEMETRY RECEIVER ENDPOINT
+# ==========================================
 @app.route('/api/data', methods=['POST'])
 def receive_data():
     try:
@@ -57,7 +59,9 @@ def receive_data():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# --- Dashboard API for JavaScript Polling ---
+# ==========================================
+# DASHBOARD REAL-TIME DATA API (GET)
+# ==========================================
 @app.route('/api/data', methods=['GET'])
 def get_latest_data():
     conn = sqlite3.connect(DB_FILE)
@@ -72,7 +76,7 @@ def get_latest_data():
     if latest:
         ts_str, temp, hum, soil, height, pump, fan, light = latest
         
-        # Consider device online if last telemetry arrived within 30 seconds
+        # Determine online status if telemetry arrived within 30 seconds
         try:
             last_dt = datetime.strptime(ts_str, '%Y-%m-%d %H:%M:%S')
             is_online = (datetime.utcnow() - last_dt) < timedelta(seconds=30)
@@ -107,7 +111,9 @@ def get_latest_data():
             "light": 0
         })
 
-# --- Chart History API Endpoint ---
+# ==========================================
+# CHART HISTORICAL TELEMETRY API
+# ==========================================
 @app.route('/api/history', methods=['GET'])
 def get_history():
     conn = sqlite3.connect(DB_FILE)
@@ -130,12 +136,20 @@ def get_history():
         })
     return jsonify(history)
 
-# --- Serves Your HTML Template ---
+# ==========================================
+# HTML DASHBOARD ROUTE (WITH ABSOLUTE PATH)
+# ==========================================
 @app.route('/')
 def dashboard():
-    with open('index.html', 'r', encoding='utf-8') as f:
-        html_content = f.read()
-    return render_template_string(html_content)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    html_path = os.path.join(base_dir, 'index.html')
+    
+    try:
+        with open(html_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        return render_template_string(html_content)
+    except FileNotFoundError:
+        return "<h2>index.html missing! Please ensure index.html is committed to your GitHub repository.</h2>", 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
