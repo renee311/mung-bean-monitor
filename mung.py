@@ -1,5 +1,6 @@
 import os
 import sqlite3
+from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
@@ -26,6 +27,7 @@ def init_db():
 
 init_db()
 
+# --- ESP32 Data Receiver ---
 @app.route('/api/data', methods=['POST'])
 def receive_data():
     try:
@@ -55,8 +57,9 @@ def receive_data():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-@app.route('/')
-def dashboard():
+# --- Dashboard API for JavaScript Polling ---
+@app.route('/api/data', methods=['GET'])
+def get_latest_data():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
@@ -67,70 +70,72 @@ def dashboard():
     conn.close()
 
     if latest:
-        ts, temp, hum, soil, height, pump, fan, light = latest
-        pump_str = "ON" if pump == 1 else "OFF"
-        fan_str = "ON" if fan == 1 else "OFF"
-        light_str = "ON" if light == 1 else "OFF"
+        ts_str, temp, hum, soil, height, pump, fan, light = latest
+        
+        # Consider device online if last telemetry arrived within 30 seconds
+        try:
+            last_dt = datetime.strptime(ts_str, '%Y-%m-%d %H:%M:%S')
+            is_online = (datetime.utcnow() - last_dt) < timedelta(seconds=30)
+        except Exception:
+            is_online = True
+
+        return jsonify({
+            "online": is_online,
+            "status": "online" if is_online else "offline",
+            "status_message": "IoT Device Online" if is_online else "IoT Device Offline",
+            "updated": ts_str,
+            "temp": temp,
+            "humidity": hum,
+            "moisture": soil,
+            "height": height,
+            "pump": pump,
+            "fan": fan,
+            "light": light
+        })
     else:
-        ts = "Waiting for ESP32..."
-        temp = hum = soil = height = "--"
-        pump = fan = light = 0
-        pump_str = fan_str = light_str = "OFF"
+        return jsonify({
+            "online": False,
+            "status": "no_data",
+            "status_message": "Awaiting ESP32 Telemetry",
+            "updated": "--",
+            "temp": 0.0,
+            "humidity": 0.0,
+            "moisture": 0,
+            "height": 0.0,
+            "pump": 0,
+            "fan": 0,
+            "light": 0
+        })
 
-    html = f'''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>🌱 Mung Bean Enclosure Monitor</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta http-equiv="refresh" content="5">
-        <style>
-            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background-color: #121212; color: #ffffff; padding: 20px; margin: 0; }}
-            h1 {{ color: #4CAF50; margin-top: 20px; }}
-            .card {{ background: #1e1e1e; border-radius: 12px; padding: 18px; margin: 12px auto; max-width: 420px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }}
-            .value {{ font-size: 2.2em; font-weight: bold; color: #00E676; margin: 5px 0; }}
-            .status-box {{ display: flex; justify-content: space-around; font-weight: bold; font-size: 1.1em; }}
-            .on {{ color: #00E676; }}
-            .off {{ color: #FF5252; }}
-            .label {{ font-size: 0.85em; color: #aaa; letter-spacing: 1px; }}
-        </style>
-    </head>
-    <body>
-        <h1>🌱 Mung Bean Enclosure Live Server</h1>
-        <p class="label">LAST UPDATED: {ts}</p>
+# --- Chart History API Endpoint ---
+@app.route('/api/history', methods=['GET'])
+def get_history():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT timestamp, temperature, humidity, soil_moisture, plant_height 
+        FROM sensor_logs ORDER BY id DESC LIMIT 50
+    ''')
+    rows = cursor.fetchall()
+    conn.close()
 
-        <div class="card">
-            <div class="label">TEMPERATURE</div>
-            <div class="value">{temp} °C</div>
-        </div>
+    history = []
+    for r in reversed(rows):
+        history.append({
+            "timestamp": r[0],
+            "temp": r[1],
+            "humidity": r[2],
+            "moisture": r[3],
+            "height": r[4]
+        })
+    return jsonify(history)
 
-        <div class="card">
-            <div class="label">HUMIDITY</div>
-            <div class="value">{hum} %</div>
-        </div>
-
-        <div class="card">
-            <div class="label">SOIL MOISTURE (RAW ADC)</div>
-            <div class="value">{soil}</div>
-        </div>
-
-        <div class="card">
-            <div class="label">PLANT HEIGHT</div>
-            <div class="value">{height} cm</div>
-        </div>
-
-        <div class="card">
-            <div class="label" style="margin-bottom: 10px;">RELAY ACTUATORS</div>
-            <div class="status-box">
-                <div>Pump: <span class="{'on' if pump == 1 else 'off'}">{pump_str}</span></div>
-                <div>Fan: <span class="{'on' if fan == 1 else 'off'}">{fan_str}</span></div>
-                <div>Light: <span class="{'on' if light == 1 else 'off'}">{light_str}</span></div>
-            </div>
-        </div>
-    </body>
-    </html>
-    '''
-    return render_template_string(html)
+# --- Serves Your HTML Template ---
+@app.route('/')
+def dashboard():
+    with open('index.html', 'r', encoding='utf-8') as f:
+        html_content = f.read()
+    return render_template_string(html_content)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

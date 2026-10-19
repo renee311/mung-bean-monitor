@@ -309,7 +309,7 @@
             <span class="iot-last-update" id="iotLastSeen"></span>
         </div>
         <div class="iot-metrics">
-            <span>🛰️ <strong>Blynk</strong> Cloud</span>
+            <span>🛰️ <strong>Render</strong> Cloud</span>
             <span>🌡️ <strong id="iotTemp">--</strong>°C</span>
             <span>💧 <strong id="iotHum">--</strong>%</span>
             <span>🌱 <strong id="iotMoist">--</strong></span>
@@ -431,14 +431,14 @@
 
     <footer class="farm-footer">
         <div class="divider"></div>
-        Mung Bean Monitor · Powered by Blynk &amp; Flask · Data logged to SQLite
+        Mung Bean Monitor · Powered by ESP32 &amp; Render Cloud · Data logged to SQLite
     </footer>
 
 </div>
 
 <script>
-    const POLL_MS = 1000;          // dashboard refresh (1 s) — snappy
-    const CHART_PUSH_MS = 20000;   // chart point every 20 s
+    const POLL_MS = 2000;          // dashboard poll interval (2 s)
+    const CHART_PUSH_MS = 10000;   // push point to charts every 10 s
     let lastChartPush = 0;
 
     const SOIL_ADC_MIN = 0;
@@ -581,10 +581,11 @@
         }
     });
 
-    // ---------- Load SQLite history (with cache-buster) ----------
+    // Load SQLite History from Flask endpoint
     async function loadHistory() {
         try {
             const res = await fetch('/api/history?_=' + Date.now(), { cache: 'no-store' });
+            if (!res.ok) return;
             const history = await res.json();
 
             history.forEach(item => {
@@ -622,7 +623,6 @@
 
         label.innerText = statusMessage || (online ? 'IoT Device Online' : 'IoT Device Offline');
 
-        // Show the actual last-update timestamp so you can SEE it ticking
         if (status === 'online' && updated) {
             lastSeen.innerText = '⏱ ' + updated;
         } else if (updated) {
@@ -668,14 +668,12 @@
         const text = document.getElementById('alertText');
         let msg = null;
 
-        if (!data.online && data.status === 'cloud_error') {
-            msg = "Cannot reach the Blynk cloud — check internet connectivity.";
-        } else if (!data.online && data.status === 'offline') {
-            msg = "The IoT device is offline. Last known readings are shown.";
+        if (!data.online && data.status === 'offline') {
+            msg = "The IoT device is offline. Showing last recorded telemetry.";
         } else if (data.online) {
-            if (data.temp > 40) msg = `High temperature detected: ${data.temp.toFixed(1)} °C — cooling may be required.`;
-            else if (data.temp < 10) msg = `Low temperature detected: ${data.temp.toFixed(1)} °C — consider heating.`;
-            else if (data.humidity < 30) msg = `Low humidity: ${data.humidity.toFixed(1)} % — consider misting.`;
+            if (data.temp > 31.5) msg = `High temperature alert: ${data.temp.toFixed(1)} °C — cooling fan triggered.`;
+            else if (data.temp < 28.0) msg = `Low temperature alert: ${data.temp.toFixed(1)} °C — heating light triggered.`;
+            else if (data.moisture > 2800) msg = `Soil dry alert: Raw ADC ${data.moisture} — irrigation pump triggered.`;
         }
 
         if (msg) {
@@ -686,7 +684,6 @@
         }
     }
 
-    // Prevent overlapping fetches if the network is slow
     let _fetching = false;
 
     async function updateDashboard() {
@@ -715,7 +712,6 @@
             updateSoilGauge(data.moisture);
             updateAlerts(data);
 
-            // Push live point to charts at a slower cadence
             const nowMs = Date.now();
             if (data.online && nowMs - lastChartPush >= CHART_PUSH_MS) {
                 lastChartPush = nowMs;
@@ -748,7 +744,7 @@
             }
         } catch (err) {
             console.error("Failed to fetch dashboard data:", err);
-            setConnectionUI(false, null, 'cloud_error', 'Cannot reach server');
+            setConnectionUI(false, null, 'cloud_error', 'Cannot reach Render server');
             document.getElementById('iotTemp').innerText  = '--';
             document.getElementById('iotHum').innerText   = '--';
             document.getElementById('iotMoist').innerText = '--';
@@ -757,7 +753,7 @@
         }
     }
 
-    // ---------- Init ----------
+    // Initialize
     loadHistory();
     updateDashboard();
     setInterval(updateDashboard, POLL_MS);
