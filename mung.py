@@ -1,156 +1,167 @@
 import os
-import sqlite3
-from datetime import datetime, timedelta
+import psycopg2
+import psycopg2.extras
+from datetime import datetime, timedelta, timezone
 from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
-DB_FILE = 'mungbean.db'
+
+# ==========================================
+# DATABASE CONFIGURATION
+# ==========================================
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# Handle Vercel/Heroku postgres:// prefix quirk
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+def get_conn():
+    return psycopg2.connect(DATABASE_URL)
 
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS sensor_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            temperature REAL,
-            humidity REAL,
-            soil_moisture INTEGER,
-            plant_height REAL,
-            pump_state INTEGER,
-            fan_state INTEGER,
-            light_state INTEGER
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    if not DATABASE_URL:
+        print("DATABASE_URL is missing!")
+        return
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS sensor_logs (
+                id SERIAL PRIMARY KEY,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                temperature REAL,
+                humidity REAL,
+                soil_moisture INTEGER,
+                plant_height REAL,
+                pump_state INTEGER,
+                fan_state INTEGER,
+                light_state INTEGER
+            )
+        ''')
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"DB Init Error: {e}")
 
+# Run on cold start
 init_db()
 
 # ==========================================
-# ESP32 TELEMETRY RECEIVER ENDPOINT
+# ESP32 TELEMETRY RECEIVER (POST)
 # ==========================================
 @app.route('/api/data', methods=['POST'])
 def receive_data():
     try:
         data = request.get_json()
         if not data:
-            return jsonify({"status": "error", "message": "Missing JSON payload"}), 400
+            return jsonify({"status": "error", "message": "Missing JSON"}), 400
 
-        temp = data.get('temperature', 0.0)
-        hum = data.get('humidity', 0.0)
-        soil = data.get('soil_moisture', 0)
-        height = data.get('plant_height', 0.0)
-        pump = data.get('pump_state', 0)
-        fan = data.get('fan_state', 0)
-        light = data.get('light_state', 0)
-
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        cursor.execute('''
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute('''
             INSERT INTO sensor_logs 
             (temperature, humidity, soil_moisture, plant_height, pump_state, fan_state, light_state) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (temp, hum, soil, height, pump, fan, light))
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ''', (
+            data.get('temperature', 0.0), data.get('humidity', 0.0), 
+            data.get('soil_moisture', 0), data.get('plant_height', 0.0), 
+            data.get('pump_state', 0), data.get('fan_state', 0), data.get('light_state', 0)
+        ))
         conn.commit()
+        cur.close()
         conn.close()
-
-        return jsonify({"status": "success", "message": "Telemetry logged"}), 200
+        return jsonify({"status": "success"}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ==========================================
-# DASHBOARD REAL-TIME DATA API (GET)
+# DASHBOARD REAL-TIME DATA (GET)
 # ==========================================
 @app.route('/api/data', methods=['GET'])
 def get_latest_data():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT timestamp, temperature, humidity, soil_moisture, plant_height, pump_state, fan_state, light_state 
-        FROM sensor_logs ORDER BY id DESC LIMIT 1
-    ''')
-    latest = cursor.fetchone()
-    conn.close()
+    try:
+        conn = get_conn()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('''
+            SELECT timestamp, temperature, humidity, soil_moisture, 
+                   plant_height, pump_state, fan_state, light_state 
+            FROM sensor_logs ORDER BY id DESC LIMIT 1
+        ''')
+        latest = cur.fetchone()
+        cur.close()
+        conn.close()
 
-    if latest:
-        ts_str, temp, hum, soil, height, pump, fan, light = latest
-        
-        # Determine online status if telemetry arrived within 30 seconds
-        try:
-            last_dt = datetime.strptime(ts_str, '%Y-%m-%d %H:%M:%S')
-            is_online = (datetime.utcnow() - last_dt) < timedelta(seconds=30)
-        except Exception:
-            is_online = True
+        if latest:
+            ts = latest['timestamp']
+            if isinstance(ts, datetime):
+                last_dt = ts.replace(tzinfo=timezone.utc) if ts.tzinfo is None else ts
+            else:
+                last_dt = datetime.strptime(str(ts), '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
 
-        return jsonify({
-            "online": is_online,
-            "status": "online" if is_online else "offline",
-            "status_message": "IoT Device Online" if is_online else "IoT Device Offline",
-            "updated": ts_str,
-            "temp": temp,
-            "humidity": hum,
-            "moisture": soil,
-            "height": height,
-            "pump": pump,
-            "fan": fan,
-            "light": light
-        })
-    else:
-        return jsonify({
-            "online": False,
-            "status": "no_data",
-            "status_message": "Awaiting ESP32 Telemetry",
-            "updated": "--",
-            "temp": 0.0,
-            "humidity": 0.0,
-            "moisture": 0,
-            "height": 0.0,
-            "pump": 0,
-            "fan": 0,
-            "light": 0
-        })
+            is_online = (datetime.now(timezone.utc) - last_dt) < timedelta(seconds=30)
+            
+            return jsonify({
+                "online": is_online,
+                "status": "online" if is_online else "offline",
+                "status_message": "IoT Device Online" if is_online else "IoT Device Offline",
+                "updated": last_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                "temp": latest['temperature'],
+                "humidity": latest['humidity'],
+                "moisture": latest['soil_moisture'],
+                "height": latest['plant_height'],
+                "pump": latest['pump_state'],
+                "fan": latest['fan_state'],
+                "light": latest['light_state']
+            })
+    except Exception as e:
+        print(f"Fetch Error: {e}")
+
+    return jsonify({
+        "online": False, "status": "no_data", "status_message": "Awaiting Telemetry",
+        "updated": "--", "temp": 0.0, "humidity": 0.0, "moisture": 0, 
+        "height": 0.0, "pump": 0, "fan": 0, "light": 0
+    })
 
 # ==========================================
-# CHART HISTORICAL TELEMETRY API
+# CHART HISTORICAL DATA (GET)
 # ==========================================
 @app.route('/api/history', methods=['GET'])
 def get_history():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT timestamp, temperature, humidity, soil_moisture, plant_height 
-        FROM sensor_logs ORDER BY id DESC LIMIT 50
-    ''')
-    rows = cursor.fetchall()
-    conn.close()
+    try:
+        conn = get_conn()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('''
+            SELECT timestamp, temperature, humidity, soil_moisture, plant_height 
+            FROM sensor_logs ORDER BY id DESC LIMIT 50
+        ''')
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
 
-    history = []
-    for r in reversed(rows):
-        history.append({
-            "timestamp": r[0],
-            "temp": r[1],
-            "humidity": r[2],
-            "moisture": r[3],
-            "height": r[4]
-        })
-    return jsonify(history)
+        history = []
+        for r in reversed(rows):
+            ts = r['timestamp']
+            ts_str = ts.strftime('%Y-%m-%d %H:%M:%S') if isinstance(ts, datetime) else str(ts)
+            history.append({
+                "timestamp": ts_str, "temp": r['temperature'], 
+                "humidity": r['humidity'], "moisture": r['soil_moisture'], "height": r['plant_height']
+            })
+        return jsonify(history)
+    except Exception:
+        return jsonify([])
 
 # ==========================================
-# HTML DASHBOARD ROUTE (WITH ABSOLUTE PATH)
+# HTML DASHBOARD ROUTE
 # ==========================================
 @app.route('/')
 def dashboard():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    html_path = os.path.join(base_dir, 'index.html')
-    
     try:
-        with open(html_path, 'r', encoding='utf-8') as f:
-            html_content = f.read()
-        return render_template_string(html_content)
+        with open(os.path.join(base_dir, 'index.html'), 'r', encoding='utf-8') as f:
+            return render_template_string(f.read())
     except FileNotFoundError:
-        return "<h2>index.html missing! Please ensure index.html is committed to your GitHub repository.</h2>", 500
+        return "<h2>index.html missing! Please ensure it is in the root folder.</h2>", 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
