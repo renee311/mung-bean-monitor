@@ -55,7 +55,8 @@
         .section-title { font-family: 'Playfair Display', serif; color: var(--leaf-pale); font-size: 1.15rem; font-weight: 600; margin: 30px 0 16px; display: flex; align-items: center; gap: 10px; letter-spacing: 0.3px; }
         .section-title::before { content: ""; width: 26px; height: 3px; background: linear-gradient(90deg, var(--leaf-light), var(--wheat)); border-radius: 2px; }
 
-        .grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; margin-bottom: 8px; }
+        /* Adjusted grid so 3 cards fill the space beautifully */
+        .grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 8px; }
         .card { background: var(--card-bg); padding: 22px 20px 20px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.18), inset 0 -3px 0 rgba(45,106,79,0.06); text-align: center; transition: transform 0.25s ease, box-shadow 0.25s ease, opacity 0.3s; position: relative; overflow: hidden; border-top: 3px solid var(--leaf-mid); }
         .card::after { content: ""; position: absolute; top: -30px; right: -30px; width: 90px; height: 90px; background: radial-gradient(circle, rgba(116,198,157,0.14), transparent 70%); border-radius: 50%; }
         .card:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(0,0,0,0.25); }
@@ -82,11 +83,12 @@
         .gauge-legend span { display: flex; align-items: center; gap: 5px; }
         .gauge-legend .dot { width: 9px; height: 9px; border-radius: 50%; }
 
-        .relay-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; }
-        .relay-card { background: var(--card-bg); padding: 20px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: opacity 0.3s, transform 0.2s; border-left: 4px solid var(--leaf-mid); }
-        .relay-card:hover { transform: translateY(-3px); }
+        /* Made this a single column so the 3 relays stack nicely next to the gauge */
+        .relay-grid { display: flex; flex-direction: column; gap: 14px; }
+        .relay-card { background: var(--card-bg); padding: 16px 20px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: opacity 0.3s, transform 0.2s; border-left: 4px solid var(--leaf-mid); height: 100%; }
+        .relay-card:hover { transform: translateX(4px); }
         .relay-card .info { display: flex; align-items: center; gap: 12px; }
-        .relay-card .icon { font-size: 1.5rem; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; background: var(--leaf-pale); border-radius: 12px; }
+        .relay-card .icon { font-size: 1.5rem; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; background: var(--leaf-pale); border-radius: 12px; flex-shrink: 0; }
         .relay-card h3 { font-size: 0.82rem; color: #4a5a50; font-weight: 600; margin-bottom: 3px; }
         .relay-card .sub { font-size: 0.7rem; color: #9aa89f; }
         .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; color: white; letter-spacing: 0.5px; min-width: 66px; justify-content: center; transition: background 0.3s; }
@@ -101,7 +103,8 @@
         .chart-panel .panel-head .hint { font-size: 0.72rem; color: #94a39a; background: var(--leaf-pale); padding: 4px 12px; border-radius: 20px; font-weight: 500; }
 
         .chart-row { display: grid; grid-template-columns: 1fr; gap: 22px; }
-        @media (min-width: 900px) { .chart-row { grid-template-columns: 1.4fr 1fr; } .chart-row .chart-panel { margin-bottom: 0; } }
+        /* Updated grid ratio for 1 gauge and a vertical list of relays */
+        @media (min-width: 900px) { .chart-row { grid-template-columns: 1fr 1fr; } .chart-row .chart-panel { margin-bottom: 0; } }
 
         .alert-strip { display: none; align-items: center; gap: 10px; background: linear-gradient(90deg, #fff3cd, #ffe8a3); border-left: 4px solid var(--wheat-dark); color: #7a5c1e; padding: 12px 18px; border-radius: 12px; font-size: 0.85rem; font-weight: 500; margin-bottom: 22px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
         .alert-strip.show { display: flex; animation: slideDown 0.4s ease; }
@@ -110,10 +113,14 @@
         .farm-footer { text-align: center; margin-top: 40px; color: rgba(216,243,220,0.45); font-size: 0.75rem; letter-spacing: 0.5px; }
         .farm-footer .divider { width: 60px; height: 1px; background: rgba(116,198,157,0.3); margin: 0 auto 12px; }
 
+        @media (max-width: 768px) {
+            .grid-container { grid-template-columns: 1fr; }
+        }
         @media (max-width: 640px) {
             body { padding: 16px 12px 40px; }
             .iot-status-bar { padding: 12px 16px; } .iot-metrics { gap: 12px; font-size: 0.78rem; padding: 6px 12px; }
-            .card .value { font-size: 1.6rem; } .relay-card { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .card .value { font-size: 1.6rem; } 
+            .relay-card { flex-direction: column; align-items: flex-start; gap: 10px; }
             .relay-card .status-pill { align-self: flex-end; }
         }
     </style>
