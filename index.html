@@ -3,23 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mung Bean Field Station - Precision Farming</title>
+    <title>Mung Bean Greenhouse - Smart Station</title>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts for a cleaner, agricultural look -->
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Merriweather:wght@700&display=swap" rel="stylesheet">
+    
     <style>
         :root {
-            --bg-gradient-start: #06150e;
-            --bg-gradient-end: #0c261a;
-            --card-bg: #ffffff;
-            --text-dark: #0f172a;
-            --text-light: #f8fafc;
+            /* Greenhouse Color Palette */
+            --bg-deep: #14261c;
+            --bg-glass: rgba(255, 255, 255, 0.1);
+            --bg-card: rgba(255, 255, 255, 0.95);
+            
+            --text-main: #1e293b;
             --text-muted: #64748b;
-            --accent-green: #22c55e;
-            --accent-green-dark: #15803d;
-            --accent-red: #ef4444;
-            --accent-amber: #f59e0b;
-            --accent-blue: #3b82f6;
-            --border-color: rgba(255, 255, 255, 0.12);
+            --text-light: #f8fafc;
+            
+            --leaf-green: #2e7d32;
+            --leaf-light: #81c784;
+            --sprout: #66bb6a;
+            --sunlight: #fbc02d;
+            --water: #29b6f6;
+            --warning: #ef5350;
+            
+            --border-glass: rgba(255, 255, 255, 0.2);
+            --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
         }
 
         * {
@@ -29,33 +38,29 @@
         }
 
         body {
-            font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(rgba(6, 21, 14, 0.82), rgba(12, 38, 26, 0.88)), 
-                        url('https://images.unsplash.com/photo-1592417817098-8f3d6eb12765?auto=format&fit=crop&w=1920&q=80');
+            font-family: 'DM Sans', sans-serif;
+            /* Background simulating looking through greenhouse glass */
+            background: 
+                linear-gradient(135deg, rgba(20, 38, 28, 0.9), rgba(20, 38, 28, 0.7)),
+                url('https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=1920&q=80');
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
-            background-color: var(--bg-gradient-start);
-            color: var(--text-light);
+            color: var(--text-main);
             min-height: 100vh;
             padding: 30px 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
             position: relative;
-            overflow-x: hidden;
         }
 
-        /* Subtle Organic Overlay */
+        /* Glass overlay effect */
         body::before {
             content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-image: radial-gradient(rgba(34, 197, 94, 0.05) 1px, transparent 1px);
-            background-size: 30px 30px;
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at 50% 0%, rgba(255,255,255,0.1) 0%, transparent 60%);
             pointer-events: none;
             z-index: 0;
         }
@@ -67,58 +72,61 @@
             z-index: 1;
         }
 
-        /* Top Header & Leaf Sprout Branding */
+        /* Header */
         header {
             text-align: center;
-            margin-bottom: 25px;
+            margin-bottom: 30px;
+            color: var(--text-light);
+            animation: fadeIn 0.8s ease-out;
         }
 
         .header-brand {
             display: inline-flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 6px;
+            gap: 12px;
+            margin-bottom: 12px;
+            background: rgba(46, 125, 50, 0.3);
+            padding: 6px 16px;
+            border-radius: 30px;
+            border: 1px solid rgba(129, 199, 132, 0.3);
+            backdrop-filter: blur(4px);
         }
 
-        .sprout-icon {
-            font-size: 2.2rem;
-            filter: drop-shadow(0 0 8px rgba(34, 197, 94, 0.4));
-        }
-
-        .subtitle-top {
+        .header-brand span {
             font-size: 0.75rem;
-            letter-spacing: 2.5px;
+            letter-spacing: 2px;
             text-transform: uppercase;
-            color: #4ade80;
             font-weight: 700;
+            color: var(--leaf-light);
         }
 
         h1 {
-            font-size: 2.4rem;
-            font-family: Georgia, 'Times New Roman', serif;
+            font-family: 'Merriweather', serif;
+            font-size: 2.6rem;
             font-weight: 700;
             color: #ffffff;
             letter-spacing: -0.5px;
+            text-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
 
-        .subtitle-sub {
-            font-size: 0.9rem;
-            color: #94a3b8;
-            margin-top: 4px;
+        .subtitle {
+            font-size: 0.95rem;
+            color: #cbd5e1;
+            margin-top: 8px;
         }
 
-        /* Glassmorphism Status Header Bar */
+        /* Top Status Bar */
         .status-bar {
-            background: rgba(12, 38, 26, 0.7);
-            border: 1px solid var(--border-color);
-            border-radius: 40px;
-            padding: 10px 25px;
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            padding: 12px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 35px;
             backdrop-filter: blur(12px);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
         }
 
         .status-pill {
@@ -127,50 +135,57 @@
             gap: 10px;
             font-size: 0.85rem;
             font-weight: 600;
-            background-color: rgba(255, 255, 255, 0.08);
-            padding: 6px 18px;
+            color: var(--text-light);
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 8px 16px;
             border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .status-dot {
-            width: 9px;
-            height: 9px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
-            background-color: var(--accent-amber);
-            box-shadow: 0 0 8px var(--accent-amber);
+            background-color: var(--sunlight);
+            box-shadow: 0 0 10px var(--sunlight);
+            transition: all 0.3s ease;
         }
 
         .quick-metrics {
             display: flex;
-            gap: 22px;
+            gap: 24px;
             font-size: 0.85rem;
-            color: #cbd5e1;
+            color: #94a3b8;
             font-weight: 500;
         }
 
         .quick-metrics strong {
             color: #ffffff;
+            margin-left: 4px;
         }
 
-        /* Section Titles with Leaf Accent */
+        /* Section Titles */
         .section-title {
-            font-size: 1.15rem;
+            font-size: 1.1rem;
             font-weight: 700;
-            margin-bottom: 16px;
+            margin-bottom: 18px;
             display: flex;
             align-items: center;
             gap: 10px;
-            color: #ffffff;
-            letter-spacing: 0.3px;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .section-title::before {
-            content: "🌿";
-            font-size: 0.95rem;
+            content: "";
+            display: block;
+            width: 4px;
+            height: 18px;
+            background-color: var(--leaf-light);
+            border-radius: 2px;
         }
 
-        /* Grids */
+        /* Grid Layouts */
         .grid-3 {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -180,87 +195,89 @@
 
         .grid-control {
             display: grid;
-            grid-template-columns: 1.4fr 1fr 1fr;
+            grid-template-columns: 1.2fr 1fr;
             gap: 20px;
             margin-bottom: 35px;
         }
 
-        /* Premium White Field Cards */
+        /* Cards (Frosted Glass & White Panels) */
         .card {
-            background-color: var(--card-bg);
-            color: var(--text-dark);
+            background: var(--bg-card);
             border-radius: 20px;
             padding: 24px;
-            box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.4);
+            box-shadow: var(--shadow-card);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             text-align: center;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: 1px solid rgba(255,255,255,0.5);
+            transition: transform 0.2s ease;
         }
 
         .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 16px 35px -5px rgba(0, 0, 0, 0.5);
+            transform: translateY(-3px);
         }
 
         .card-icon {
-            font-size: 1.8rem;
-            margin-bottom: 8px;
+            font-size: 2rem;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
         }
 
         .card-label {
             font-size: 0.75rem;
-            font-weight: 800;
-            letter-spacing: 1.2px;
+            font-weight: 700;
+            letter-spacing: 1px;
             color: var(--text-muted);
             text-transform: uppercase;
             margin-bottom: 8px;
         }
 
         .card-value {
-            font-size: 2.2rem;
-            font-weight: 800;
-            color: var(--text-dark);
+            font-size: 2.4rem;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: -1px;
         }
 
-        /* Relays Column & Actuator Cards */
+        /* Actuator Relays */
         .relays-column {
             display: flex;
             flex-direction: column;
-            gap: 18px;
+            gap: 16px;
         }
 
         .actuator-card {
-            background-color: var(--card-bg);
-            color: var(--text-dark);
-            border-radius: 18px;
-            padding: 18px 22px;
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 16px 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35);
+            box-shadow: var(--shadow-card);
+            border: 1px solid rgba(255,255,255,0.5);
         }
 
         .actuator-info {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 16px;
             text-align: left;
         }
 
         .actuator-icon {
-            font-size: 1.6rem;
+            font-size: 1.5rem;
             background: #f1f5f9;
-            padding: 8px;
-            border-radius: 12px;
+            padding: 10px;
+            border-radius: 14px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
         }
 
         .actuator-title {
             font-weight: 700;
-            font-size: 0.95rem;
-            color: var(--text-dark);
+            font-size: 1rem;
+            color: var(--text-main);
         }
 
         .actuator-sub {
@@ -270,7 +287,7 @@
         }
 
         .badge-pill {
-            padding: 6px 14px;
+            padding: 6px 16px;
             border-radius: 20px;
             font-size: 0.75rem;
             font-weight: 800;
@@ -278,168 +295,191 @@
             align-items: center;
             gap: 6px;
             letter-spacing: 0.5px;
+            transition: all 0.3s ease;
         }
 
         .badge-off { 
             background-color: #f1f5f9; 
-            color: #64748b; 
-            border: 1px solid #cbd5e1;
+            color: #94a3b8; 
+            border: 1px solid #e2e8f0;
         }
         
         .badge-on { 
             background-color: #dcfce7; 
-            color: #15803d; 
+            color: #166534; 
             border: 1px solid #86efac;
-            box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
+            box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
         }
 
-        /* Chart Canvas Containers */
+        /* Chart Panel */
+        .chart-panel {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: var(--shadow-card);
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .chart-title {
+            font-weight: 700;
+            color: var(--text-main);
+            font-size: 1.1rem;
+        }
+
         .chart-container {
             width: 100%;
-            height: 200px;
+            height: 250px;
             position: relative;
         }
 
-        .chart-card-large {
-            grid-column: span 3;
-            background-color: var(--card-bg);
-            color: var(--text-dark);
-            border-radius: 20px;
-            padding: 26px;
-            box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.4);
-        }
-
         footer {
-            margin-top: 30px;
-            font-size: 0.8rem;
-            color: #64748b;
+            margin-top: 40px;
+            font-size: 0.85rem;
+            color: #94a3b8;
             text-align: center;
+            font-weight: 500;
         }
 
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Responsive */
         @media (max-width: 900px) {
             .grid-3, .grid-control {
                 grid-template-columns: 1fr;
             }
-            .chart-card-large {
-                grid-column: span 1;
-            }
             .status-bar {
                 flex-direction: column;
-                gap: 12px;
+                gap: 15px;
+                text-align: center;
             }
+            .quick-metrics {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            h1 { font-size: 2rem; }
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <!-- Header with Mung Bean Sprout Aesthetic -->
+    <!-- Greenhouse Header -->
     <header>
         <div class="header-brand">
-            <span class="sprout-icon">🌱</span>
-            <div class="subtitle-top">SMART AGRICULTURE • PRECISION FARMING</div>
+            <span>🌱</span>
+            <span>Mung Bean Greenhouse Station</span>
         </div>
-        <h1>Mung Bean Field Station</h1>
-        <div class="subtitle-sub">Live environmental telemetry & automated greenhouse climate control</div>
+        <h1>Precision Agriculture</h1>
+        <div class="subtitle">Live microclimate telemetry & automated environmental control</div>
     </header>
 
     <!-- Top Status Bar -->
     <div class="status-bar">
         <div class="status-pill">
             <div id="status-dot" class="status-dot"></div>
-            <span id="status-text">Checking Telemetry...</span>
+            <span id="status-text">Connecting to Greenhouse...</span>
         </div>
         <div class="quick-metrics">
-            <span>⚡ Vercel Cloud</span>
+            <span>🛰️ Cloud Sync</span>
             <span>🌡️ <strong id="quick-temp">--°C</strong></span>
             <span>💧 <strong id="quick-hum">--%</strong></span>
             <span>🌱 <strong id="quick-moist">--%</strong></span>
         </div>
     </div>
 
-    <!-- Section 1: Field Readings -->
-    <div class="section-title">Field Readings</div>
+    <!-- Section 1: Microclimate Readings -->
+    <div class="section-title">Microclimate Readings</div>
     <div class="grid-3">
         <div class="card">
             <div class="card-icon">🌡️</div>
-            <div class="card-label">AIR TEMPERATURE</div>
+            <div class="card-label">Air Temperature</div>
             <div id="val-temp" class="card-value">-- °C</div>
         </div>
         <div class="card">
             <div class="card-icon">💧</div>
-            <div class="card-label">RELATIVE HUMIDITY</div>
+            <div class="card-label">Relative Humidity</div>
             <div id="val-humidity" class="card-value">-- %</div>
         </div>
         <div class="card">
-            <div class="card-icon">🌱</div>
-            <div class="card-label">SOIL MOISTURE</div>
+            <div class="card-icon">🪴</div>
+            <div class="card-label">Soil Moisture</div>
             <div id="val-moisture" class="card-value">-- %</div>
         </div>
     </div>
 
     <!-- Section 2: Irrigation & Climate Control -->
-    <div class="section-title">Irrigation & Climate Control</div>
+    <div class="section-title">Greenhouse Automation</div>
     <div class="grid-control">
+        
         <!-- Moisture Gauge Card -->
-        <div class="card" style="justify-content: space-between;">
-            <div class="card-label">SOIL MOISTURE INDEX</div>
-            <div style="position: relative; width: 150px; height: 150px; margin: 10px 0;">
+        <div class="card" style="justify-content: space-between; padding: 30px;">
+            <div class="card-label">Irrigation Index</div>
+            <div style="position: relative; width: 160px; height: 160px; margin: 15px 0;">
                 <canvas id="gaugeChart"></canvas>
                 <div style="position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
-                    <div id="gauge-val" style="font-size: 1.6rem; font-weight: 800; color: var(--text-dark);">--</div>
-                    <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700; letter-spacing: 1px;">STATUS</div>
+                    <div id="gauge-val" style="font-size: 1.8rem; font-weight: 800; color: var(--text-main);">--</div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; letter-spacing: 1px; margin-top: 4px;">WATER LEVEL</div>
                 </div>
             </div>
-            <div style="display: flex; gap: 14px; font-size: 0.72rem; font-weight: 700;">
-                <span style="color: var(--accent-red);">● Dry (&lt;30%)</span>
-                <span style="color: var(--accent-amber);">● Moderate</span>
-                <span style="color: var(--accent-green-dark);">● Optimal</span>
+            <div style="display: flex; gap: 18px; font-size: 0.75rem; font-weight: 700; color: var(--text-muted);">
+                <span style="color: var(--warning);">● Dry (&lt;30%)</span>
+                <span style="color: var(--sunlight);">● Moderate</span>
+                <span style="color: var(--leaf-green);">● Optimal</span>
             </div>
         </div>
 
-        <!-- Relays Column 1 -->
+        <!-- Actuators Column -->
         <div class="relays-column">
             <div class="actuator-card">
                 <div class="actuator-info">
-                    <div class="actuator-icon">💧</div>
+                    <div class="actuator-icon">🚿</div>
                     <div>
-                        <div class="actuator-title">Water Pump</div>
-                        <div class="actuator-sub">Irrigation relay</div>
+                        <div class="actuator-title">Irrigation Pump</div>
+                        <div class="actuator-sub">Automated watering</div>
                     </div>
                 </div>
                 <div id="badge-pump" class="badge-pill badge-off">● OFF</div>
             </div>
             <div class="actuator-card">
                 <div class="actuator-info">
-                    <div class="actuator-icon">💡</div>
+                    <div class="actuator-icon">🌀</div>
                     <div>
-                        <div class="actuator-title">Heating Light</div>
-                        <div class="actuator-sub">Thermal relay</div>
+                        <div class="actuator-title">Ventilation Fan</div>
+                        <div class="actuator-sub">Air circulation</div>
+                    </div>
+                </div>
+                <div id="badge-fan" class="badge-pill badge-off">● OFF</div>
+            </div>
+            <div class="actuator-card">
+                <div class="actuator-info">
+                    <div class="actuator-icon">☀️</div>
+                    <div>
+                        <div class="actuator-title">Heating Lamp</div>
+                        <div class="actuator-sub">Thermal regulation</div>
                     </div>
                 </div>
                 <div id="badge-light" class="badge-pill badge-off">● OFF</div>
             </div>
         </div>
-
-        <!-- Relays Column 2 -->
-        <div class="relays-column">
-            <div class="actuator-card">
-                <div class="actuator-info">
-                    <div class="actuator-icon">🌀</div>
-                    <div>
-                        <div class="actuator-title">Cooling Fan</div>
-                        <div class="actuator-sub">Ventilation relay</div>
-                    </div>
-                </div>
-                <div id="badge-fan" class="badge-pill badge-off">● OFF</div>
-            </div>
-        </div>
     </div>
 
     <!-- Section 3: Historical Trends -->
-    <div class="section-title">Historical Trends</div>
-    <div class="chart-card-large">
-        <div class="card-label" style="text-align: left; margin-bottom: 15px;">24-HOUR TELEMETRY HISTORY</div>
+    <div class="section-title">Telemetry History</div>
+    <div class="chart-panel">
+        <div class="chart-header">
+            <div class="chart-title">24-Hour Environmental Trends</div>
+        </div>
         <div class="chart-container">
             <canvas id="historyChart"></canvas>
         </div>
@@ -451,24 +491,25 @@
 </div>
 
 <script>
-    // Determine target API origin (supports local development, blob previews, and Vercel production)
+    // Determine target API origin
     const API_BASE = (window.location.origin && !window.location.origin.startsWith('blob:')) 
         ? window.location.origin 
         : 'https://mung-bean-monitor.vercel.app';
 
-    // 1. Initialize Soil Moisture Gauge Chart
+    // 1. Initialize Soil Moisture Gauge (Semi-circle)
     const gaugeCtx = document.getElementById('gaugeChart').getContext('2d');
     const gaugeChart = new Chart(gaugeCtx, {
         type: 'doughnut',
         data: {
             datasets: [{
                 data: [0, 100],
-                backgroundColor: ['#22c55e', '#e2e8f0'],
-                borderWidth: 0
+                backgroundColor: ['#2e7d32', '#e2e8f0'],
+                borderWidth: 0,
+                borderRadius: 10
             }]
         },
         options: {
-            cutout: '78%',
+            cutout: '80%',
             rotation: -90,
             circumference: 180,
             plugins: { tooltip: { enabled: false } },
@@ -484,49 +525,52 @@
         data: {
             labels: [],
             datasets: [
-                { label: 'Temp (°C)', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', tension: 0.35, pointRadius: 3 },
-                { label: 'Humidity (%)', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.35, pointRadius: 3 },
-                { label: 'Soil Moisture (%)', data: [], borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', tension: 0.35, pointRadius: 3 }
+                { label: 'Temp (°C)', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', tension: 0.4, pointRadius: 3, fill: true },
+                { label: 'Humidity (%)', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.4, pointRadius: 3, fill: true },
+                { label: 'Soil Moisture (%)', data: [], borderColor: '#2e7d32', backgroundColor: 'rgba(46, 125, 50, 0.1)', tension: 0.4, pointRadius: 3, fill: true }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             scales: {
-                x: { grid: { display: false } },
-                y: { grid: { color: '#f1f5f9' }, beginAtZero: true }
+                x: { grid: { display: false }, ticks: { color: '#64748b' } },
+                y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { color: '#64748b' } }
             },
             plugins: { 
-                legend: { position: 'top', labels: { usePointStyle: true, font: { weight: '600' } } } 
+                legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8, font: { family: "'DM Sans', sans-serif", weight: '600' } } },
+                tooltip: { backgroundColor: 'rgba(20, 38, 28, 0.9)', padding: 12, cornerRadius: 8, titleFont: { family: "'DM Sans', sans-serif" }, bodyFont: { family: "'DM Sans', sans-serif" } }
             }
         }
     });
 
-    // 3. Fetch Real-time Telemetry Data (/api/data)
+    // 3. Fetch Real-time Data
     async function fetchLatestData() {
         try {
-            const res = await fetch(`${API_BASE}/api/data`);
+            const res = await fetch(`${API_BASE}/api/data?t=${Date.now()}`);
             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             const data = await res.json();
 
-            // Status Bar Indicator
+            // Status Bar
             const dot = document.getElementById('status-dot');
             const statusText = document.getElementById('status-text');
             if (data.online) {
                 dot.style.backgroundColor = '#22c55e';
                 dot.style.boxShadow = '0 0 10px #22c55e';
-                statusText.textContent = 'IoT Device Online';
+                statusText.textContent = 'Greenhouse Online';
             } else {
                 dot.style.backgroundColor = '#ef4444';
                 dot.style.boxShadow = '0 0 10px #ef4444';
-                statusText.textContent = data.status === 'no_data' ? 'Awaiting Telemetry' : 'IoT Device Offline';
+                statusText.textContent = data.status === 'no_data' ? 'Awaiting Telemetry' : 'Greenhouse Offline';
             }
 
-            // Temperature, Humidity, Moisture Cards
+            // Data Formatting
             const tempVal = (data.temp !== null && data.temp !== undefined) ? `${data.temp.toFixed(1)}` : '--';
             const humVal  = (data.humidity !== null && data.humidity !== undefined) ? `${data.humidity.toFixed(1)}` : '--';
             const moistVal = (data.moisture !== null && data.moisture !== undefined) ? `${data.moisture}` : '--';
 
+            // Update UI Cards
             document.getElementById('val-temp').textContent = `${tempVal} °C`;
             document.getElementById('val-humidity').textContent = `${humVal} %`;
             document.getElementById('val-moisture').textContent = `${moistVal} %`;
@@ -535,14 +579,14 @@
             document.getElementById('quick-hum').textContent = `${humVal}%`;
             document.getElementById('quick-moist').textContent = `${moistVal}%`;
 
-            // Gauge chart update
+            // Update Gauge
             const moistNum = (data.moisture !== null && data.moisture !== undefined) ? data.moisture : 0;
             gaugeChart.data.datasets[0].data = [moistNum, 100 - moistNum];
-            gaugeChart.data.datasets[0].backgroundColor = moistNum < 30 ? ['#ef4444', '#e2e8f0'] : ['#22c55e', '#e2e8f0'];
+            gaugeChart.data.datasets[0].backgroundColor = moistNum < 30 ? ['#ef4444', '#e2e8f0'] : ['#2e7d32', '#e2e8f0'];
             gaugeChart.update();
             document.getElementById('gauge-val').textContent = `${moistNum}%`;
 
-            // Actuator badges
+            // Update Actuator Badges
             updateBadge('badge-pump', data.pump);
             updateBadge('badge-fan', data.fan);
             updateBadge('badge-light', data.light);
@@ -552,7 +596,7 @@
             }
 
         } catch (err) {
-            console.error('Fetch latest data error:', err);
+            console.error('Fetch error:', err);
             const dot = document.getElementById('status-dot');
             dot.style.backgroundColor = '#ef4444';
             dot.style.boxShadow = '0 0 10px #ef4444';
@@ -560,10 +604,10 @@
         }
     }
 
-    // 4. Fetch Historical Telemetry Data (/api/history)
+    // 4. Fetch Historical Data
     async function fetchHistory() {
         try {
-            const res = await fetch(`${API_BASE}/api/history`);
+            const res = await fetch(`${API_BASE}/api/history?t=${Date.now()}`);
             if (!res.ok) return;
             const history = await res.json();
 
@@ -580,7 +624,7 @@
                 historyChart.update();
             }
         } catch (err) {
-            console.error('Fetch history error:', err);
+            console.error('History error:', err);
         }
     }
 
@@ -596,8 +640,8 @@
     }
 
     // Polling Intervals
-    setInterval(fetchLatestData, 3000);  // Poll real-time data every 3 seconds
-    setInterval(fetchHistory, 15000);    // Poll history data every 15 seconds
+    setInterval(fetchLatestData, 3000);
+    setInterval(fetchHistory, 15000);
 
     // Initial Execution
     fetchLatestData();
