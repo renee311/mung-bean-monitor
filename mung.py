@@ -6,24 +6,26 @@ from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
 
-# database config
+# Database configuration
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# vercel/heroku gives postgres:// but psycopg2 wants postgresql://
+# Vercel/Heroku gives postgres:// but psycopg2 requires postgresql://
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 def get_conn():
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL environment variable is missing!")
     return psycopg2.connect(DATABASE_URL)
 
 def init_db():
     if not DATABASE_URL:
         print("DATABASE_URL is missing!")
         return
+    conn = None
     try:
         conn = get_conn()
         cur = conn.cursor()
-        # Using TIMESTAMPTZ to ensure timezone accuracy
         cur.execute('''
             CREATE TABLE IF NOT EXISTS sensor_logs (
                 id SERIAL PRIMARY KEY,
@@ -38,20 +40,29 @@ def init_db():
         ''')
         conn.commit()
         cur.close()
-        conn.close()
     except Exception as e:
         print(f"DB Init Error: {e}")
+    finally:
+        if conn:
+            conn.close()
 
-# run on cold start
+# Initialize DB structure on startup
 init_db()
 
-# receive data from esp32
+# Receive Telemetry from ESP32
 @app.route('/api/data', methods=['POST'])
 def receive_data():
     try:
         data = request.get_json()
         if not data:
-            return jsonify({"status": "error", "message": "Missing JSON"}), 400
+            return jsonify({"status": "error", "message": "Missing JSON payload"}), 400
+
+        temp = data.get('temperature')
+        hum = data.get('humidity')
+        moisture = data.get('soil_moisture')
+        pump = data.get('pump_state', 0)
+        fan = data.get('fan_state', 0)
+        light = data.get('light_state', 0)
 
         conn = get_conn()
         cur = conn.cursor()
@@ -59,46 +70,43 @@ def receive_data():
             INSERT INTO sensor_logs 
             (temperature, humidity, soil_moisture, pump_state, fan_state, light_state) 
             VALUES (%s, %s, %s, %s, %s, %s)
-        ''', (
-            data.get('temperature', 0.0), data.get('humidity', 0.0), 
-            data.get('soil_moisture', 0), 
-            data.get('pump_state', 0), data.get('fan_state', 0), data.get('light_state', 0)
-        ))
+        ''', (temp, hum, moisture, pump, fan, light))
+        
         conn.commit()
         cur.close()
         conn.close()
         return jsonify({"status": "success"}), 200
+
     except Exception as e:
         print(f"POST Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# latest reading for dashboard
+# Get Latest Reading for Dashboard
 @app.route('/api/data', methods=['GET'])
 def get_latest_data():
+    conn = None
     try:
         conn = get_conn()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute('''
-            SELECT timestamp, temperature, humidity, soil_moisture, 
+            SELECT timestamp, temperature, humidity, soil_moisture,
                    pump_state, fan_state, light_state 
             FROM sensor_logs ORDER BY id DESC LIMIT 1
         ''')
         latest = cur.fetchone()
         cur.close()
-        conn.close()
 
         if latest:
             ts = latest['timestamp']
-            # Handle timezone-aware comparison
             if isinstance(ts, datetime):
                 last_dt = ts.replace(tzinfo=timezone.utc) if ts.tzinfo is None else ts
             else:
                 last_dt = datetime.strptime(str(ts), '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
 
-            # Check if last update was within the last 30 seconds
+            # Mark online if telemetry was received within the last 30 seconds
             now_utc = datetime.now(timezone.utc)
             is_online = (now_utc - last_dt) < timedelta(seconds=30)
-            
+
             return jsonify({
                 "online": is_online,
                 "status": "online" if is_online else "offline",
@@ -113,17 +121,21 @@ def get_latest_data():
             })
     except Exception as e:
         print(f"GET Error: {e}")
+    finally:
+        if conn:
+            conn.close()
 
-    # Fallback if no data exists yet
+    # Fallback response when database is empty
     return jsonify({
         "online": False, "status": "no_data", "status_message": "Awaiting Telemetry",
-        "updated": "--", "temp": 0.0, "humidity": 0.0, "moisture": 0, 
+        "updated": "--", "temp": 0.0, "humidity": 0.0, "moisture": 0,
         "pump": 0, "fan": 0, "light": 0
     })
 
-# history for charts
+# Fetch History for Dashboard Charts
 @app.route('/api/history', methods=['GET'])
 def get_history():
+    conn = None
     try:
         conn = get_conn()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -133,22 +145,26 @@ def get_history():
         ''')
         rows = cur.fetchall()
         cur.close()
-        conn.close()
 
         history = []
         for r in reversed(rows):
             ts = r['timestamp']
             ts_str = ts.strftime('%Y-%m-%d %H:%M:%S') if isinstance(ts, datetime) else str(ts)
             history.append({
-                "timestamp": ts_str, "temp": r['temperature'], 
-                "humidity": r['humidity'], "moisture": r['soil_moisture']
+                "timestamp": ts_str, 
+                "temp": r['temperature'], 
+                "humidity": r['humidity'], 
+                "moisture": r['soil_moisture']
             })
         return jsonify(history)
     except Exception as e:
         print(f"History Error: {e}")
         return jsonify([])
+    finally:
+        if conn:
+            conn.close()
 
-# dashboard page
+# Dashboard Page Route
 @app.route('/')
 def dashboard():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -156,7 +172,7 @@ def dashboard():
         with open(os.path.join(base_dir, 'index.html'), 'r', encoding='utf-8') as f:
             return render_template_string(f.read())
     except FileNotFoundError:
-        return "<h2>index.html missing! Please ensure it is in the root folder.</h2>", 500
+        return "<h2>index.html missing! Please ensure it is located in the root folder.</h2>", 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
