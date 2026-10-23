@@ -3,125 +3,174 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mung Bean Field Station</title>
+    <title>Mung Bean Field Station - Precision Farming</title>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --bg-color: #0d2319;
+            --bg-gradient-start: #06150e;
+            --bg-gradient-end: #0c261a;
             --card-bg: #ffffff;
-            --text-dark: #1e293b;
+            --text-dark: #0f172a;
             --text-light: #f8fafc;
             --text-muted: #64748b;
             --accent-green: #22c55e;
+            --accent-green-dark: #15803d;
             --accent-red: #ef4444;
             --accent-amber: #f59e0b;
             --accent-blue: #3b82f6;
-            --border-color: rgba(255, 255, 255, 0.1);
+            --border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background-color: var(--bg-color);
+            font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(rgba(6, 21, 14, 0.82), rgba(12, 38, 26, 0.88)), 
+                        url('https://images.unsplash.com/photo-1592417817098-8f3d6eb12765?auto=format&fit=crop&w=1920&q=80');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-color: var(--bg-gradient-start);
             color: var(--text-light);
-            margin: 0;
+            min-height: 100vh;
             padding: 30px 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Subtle Organic Overlay */
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: radial-gradient(rgba(34, 197, 94, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            pointer-events: none;
+            z-index: 0;
         }
 
         .container {
             max-width: 1100px;
             width: 100%;
+            position: relative;
+            z-index: 1;
         }
 
-        /* Top Header */
+        /* Top Header & Leaf Sprout Branding */
         header {
             text-align: center;
             margin-bottom: 25px;
         }
 
+        .header-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .sprout-icon {
+            font-size: 2.2rem;
+            filter: drop-shadow(0 0 8px rgba(34, 197, 94, 0.4));
+        }
+
         .subtitle-top {
             font-size: 0.75rem;
-            letter-spacing: 2px;
+            letter-spacing: 2.5px;
             text-transform: uppercase;
             color: #4ade80;
-            margin-bottom: 5px;
-            font-weight: 600;
+            font-weight: 700;
         }
 
         h1 {
-            margin: 0;
-            font-size: 2.2rem;
+            font-size: 2.4rem;
             font-family: Georgia, 'Times New Roman', serif;
             font-weight: 700;
             color: #ffffff;
+            letter-spacing: -0.5px;
         }
 
         .subtitle-sub {
             font-size: 0.9rem;
             color: #94a3b8;
-            margin-top: 5px;
+            margin-top: 4px;
         }
 
-        /* Top Status Bar */
+        /* Glassmorphism Status Header Bar */
         .status-bar {
-            background-color: rgba(15, 34, 25, 0.8);
+            background: rgba(12, 38, 26, 0.7);
             border: 1px solid var(--border-color);
-            border-radius: 30px;
+            border-radius: 40px;
             padding: 10px 25px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 35px;
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
 
         .status-pill {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             font-size: 0.85rem;
             font-weight: 600;
             background-color: rgba(255, 255, 255, 0.08);
-            padding: 6px 16px;
+            padding: 6px 18px;
             border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .status-dot {
-            width: 8px;
-            height: 8px;
+            width: 9px;
+            height: 9px;
             border-radius: 50%;
             background-color: var(--accent-amber);
+            box-shadow: 0 0 8px var(--accent-amber);
         }
 
         .quick-metrics {
             display: flex;
-            gap: 20px;
+            gap: 22px;
             font-size: 0.85rem;
             color: #cbd5e1;
             font-weight: 500;
         }
 
-        /* Section Titles */
-        .section-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .quick-metrics strong {
             color: #ffffff;
         }
 
-        .section-title::before {
-            content: "—";
-            color: #4ade80;
-            font-weight: bold;
+        /* Section Titles with Leaf Accent */
+        .section-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #ffffff;
+            letter-spacing: 0.3px;
         }
 
-        /* Grid Layouts */
+        .section-title::before {
+            content: "🌿";
+            font-size: 0.95rem;
+        }
+
+        /* Grids */
         .grid-3 {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -131,98 +180,123 @@
 
         .grid-control {
             display: grid;
-            grid-template-columns: 1.5fr 1fr 1fr;
+            grid-template-columns: 1.4fr 1fr 1fr;
             gap: 20px;
             margin-bottom: 35px;
         }
 
-        /* White Cards */
+        /* Premium White Field Cards */
         .card {
             background-color: var(--card-bg);
             color: var(--text-dark);
-            border-radius: 16px;
-            padding: 22px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.4);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             text-align: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 16px 35px -5px rgba(0, 0, 0, 0.5);
         }
 
         .card-icon {
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             margin-bottom: 8px;
         }
 
         .card-label {
             font-size: 0.75rem;
-            font-weight: 700;
-            letter-spacing: 1px;
+            font-weight: 800;
+            letter-spacing: 1.2px;
             color: var(--text-muted);
             text-transform: uppercase;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .card-value {
-            font-size: 2rem;
+            font-size: 2.2rem;
             font-weight: 800;
-            color: #0f172a;
+            color: var(--text-dark);
         }
 
-        /* Relays Side Column Layout */
+        /* Relays Column & Actuator Cards */
         .relays-column {
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 18px;
         }
 
         .actuator-card {
             background-color: var(--card-bg);
             color: var(--text-dark);
-            border-radius: 16px;
-            padding: 16px 20px;
+            border-radius: 18px;
+            padding: 18px 22px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35);
         }
 
         .actuator-info {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
             text-align: left;
+        }
+
+        .actuator-icon {
+            font-size: 1.6rem;
+            background: #f1f5f9;
+            padding: 8px;
+            border-radius: 12px;
         }
 
         .actuator-title {
             font-weight: 700;
-            font-size: 0.9rem;
-            color: #0f172a;
+            font-size: 0.95rem;
+            color: var(--text-dark);
         }
 
         .actuator-sub {
             font-size: 0.75rem;
             color: var(--text-muted);
+            margin-top: 2px;
         }
 
         .badge-pill {
             padding: 6px 14px;
             border-radius: 20px;
             font-size: 0.75rem;
-            font-weight: 700;
+            font-weight: 800;
             display: flex;
             align-items: center;
             gap: 6px;
+            letter-spacing: 0.5px;
         }
 
-        .badge-off { background-color: #f1f5f9; color: #64748b; }
-        .badge-on { background-color: #dcfce7; color: #15803d; }
+        .badge-off { 
+            background-color: #f1f5f9; 
+            color: #64748b; 
+            border: 1px solid #cbd5e1;
+        }
+        
+        .badge-on { 
+            background-color: #dcfce7; 
+            color: #15803d; 
+            border: 1px solid #86efac;
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
+        }
 
         /* Chart Canvas Containers */
         .chart-container {
             width: 100%;
-            height: 180px;
+            height: 200px;
             position: relative;
         }
 
@@ -230,9 +304,16 @@
             grid-column: span 3;
             background-color: var(--card-bg);
             color: var(--text-dark);
-            border-radius: 16px;
-            padding: 25px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            padding: 26px;
+            box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.4);
+        }
+
+        footer {
+            margin-top: 30px;
+            font-size: 0.8rem;
+            color: #64748b;
+            text-align: center;
         }
 
         @media (max-width: 900px) {
@@ -242,34 +323,41 @@
             .chart-card-large {
                 grid-column: span 1;
             }
+            .status-bar {
+                flex-direction: column;
+                gap: 12px;
+            }
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <!-- Header -->
+    <!-- Header with Mung Bean Sprout Aesthetic -->
     <header>
-        <div class="subtitle-top">SMART AGRICULTURE • PRECISION FARMING</div>
-        <h1>🌱 Mung Bean Field Station</h1>
-        <div class="subtitle-sub">Live environmental telemetry & automated greenhouse control</div>
+        <div class="header-brand">
+            <span class="sprout-icon">🌱</span>
+            <div class="subtitle-top">SMART AGRICULTURE • PRECISION FARMING</div>
+        </div>
+        <h1>Mung Bean Field Station</h1>
+        <div class="subtitle-sub">Live environmental telemetry & automated greenhouse climate control</div>
     </header>
 
     <!-- Top Status Bar -->
     <div class="status-bar">
         <div class="status-pill">
             <div id="status-dot" class="status-dot"></div>
-            <span id="status-text">Checking...</span>
+            <span id="status-text">Checking Telemetry...</span>
         </div>
         <div class="quick-metrics">
-            <span>📡 Vercel Cloud</span>
+            <span>⚡ Vercel Cloud</span>
             <span>🌡️ <strong id="quick-temp">--°C</strong></span>
             <span>💧 <strong id="quick-hum">--%</strong></span>
             <span>🌱 <strong id="quick-moist">--%</strong></span>
         </div>
     </div>
 
-    <!-- Field Readings -->
+    <!-- Section 1: Field Readings -->
     <div class="section-title">Field Readings</div>
     <div class="grid-3">
         <div class="card">
@@ -289,23 +377,23 @@
         </div>
     </div>
 
-    <!-- Irrigation & Climate Control -->
+    <!-- Section 2: Irrigation & Climate Control -->
     <div class="section-title">Irrigation & Climate Control</div>
     <div class="grid-control">
         <!-- Moisture Gauge Card -->
         <div class="card" style="justify-content: space-between;">
             <div class="card-label">SOIL MOISTURE INDEX</div>
-            <div style="position: relative; width: 140px; height: 140px;">
+            <div style="position: relative; width: 150px; height: 150px; margin: 10px 0;">
                 <canvas id="gaugeChart"></canvas>
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
-                    <div id="gauge-val" style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">--</div>
-                    <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">STATUS</div>
+                <div style="position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                    <div id="gauge-val" style="font-size: 1.6rem; font-weight: 800; color: var(--text-dark);">--</div>
+                    <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700; letter-spacing: 1px;">STATUS</div>
                 </div>
             </div>
-            <div style="display: flex; gap: 15px; font-size: 0.7rem; font-weight: 600; margin-top: 10px;">
-                <span style="color: var(--accent-red);">● Dry (<30%)</span>
+            <div style="display: flex; gap: 14px; font-size: 0.72rem; font-weight: 700;">
+                <span style="color: var(--accent-red);">● Dry (&lt;30%)</span>
                 <span style="color: var(--accent-amber);">● Moderate</span>
-                <span style="color: var(--accent-green);">● Optimal</span>
+                <span style="color: var(--accent-green-dark);">● Optimal</span>
             </div>
         </div>
 
@@ -313,7 +401,7 @@
         <div class="relays-column">
             <div class="actuator-card">
                 <div class="actuator-info">
-                    <div style="font-size: 1.5rem;">💧</div>
+                    <div class="actuator-icon">💧</div>
                     <div>
                         <div class="actuator-title">Water Pump</div>
                         <div class="actuator-sub">Irrigation relay</div>
@@ -323,7 +411,7 @@
             </div>
             <div class="actuator-card">
                 <div class="actuator-info">
-                    <div style="font-size: 1.5rem;">💡</div>
+                    <div class="actuator-icon">💡</div>
                     <div>
                         <div class="actuator-title">Heating Light</div>
                         <div class="actuator-sub">Thermal relay</div>
@@ -337,7 +425,7 @@
         <div class="relays-column">
             <div class="actuator-card">
                 <div class="actuator-info">
-                    <div style="font-size: 1.5rem;">🌀</div>
+                    <div class="actuator-icon">🌀</div>
                     <div>
                         <div class="actuator-title">Cooling Fan</div>
                         <div class="actuator-sub">Ventilation relay</div>
@@ -348,7 +436,7 @@
         </div>
     </div>
 
-    <!-- Historical Trends -->
+    <!-- Section 3: Historical Trends -->
     <div class="section-title">Historical Trends</div>
     <div class="chart-card-large">
         <div class="card-label" style="text-align: left; margin-bottom: 15px;">24-HOUR TELEMETRY HISTORY</div>
@@ -356,10 +444,19 @@
             <canvas id="historyChart"></canvas>
         </div>
     </div>
+
+    <footer>
+        <p id="last-updated">Connecting to Mung Bean Telemetry Service...</p>
+    </footer>
 </div>
 
 <script>
-    // Initialize Gauge Chart
+    // Determine target API origin (supports local development, blob previews, and Vercel production)
+    const API_BASE = (window.location.origin && !window.location.origin.startsWith('blob:')) 
+        ? window.location.origin 
+        : 'https://mung-bean-monitor.vercel.app';
+
+    // 1. Initialize Soil Moisture Gauge Chart
     const gaugeCtx = document.getElementById('gaugeChart').getContext('2d');
     const gaugeChart = new Chart(gaugeCtx, {
         type: 'doughnut',
@@ -371,7 +468,7 @@
             }]
         },
         options: {
-            cutout: '80%',
+            cutout: '78%',
             rotation: -90,
             circumference: 180,
             plugins: { tooltip: { enabled: false } },
@@ -380,16 +477,16 @@
         }
     });
 
-    // Initialize History Line Chart
+    // 2. Initialize Telemetry History Line Chart
     const historyCtx = document.getElementById('historyChart').getContext('2d');
     const historyChart = new Chart(historyCtx, {
         type: 'line',
         data: {
             labels: [],
             datasets: [
-                { label: 'Temp (°C)', data: [], borderColor: '#ef4444', tension: 0.3, pointRadius: 2 },
-                { label: 'Humidity (%)', data: [], borderColor: '#3b82f6', tension: 0.3, pointRadius: 2 },
-                { label: 'Soil Moisture (%)', data: [], borderColor: '#22c55e', tension: 0.3, pointRadius: 2 }
+                { label: 'Temp (°C)', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', tension: 0.35, pointRadius: 3 },
+                { label: 'Humidity (%)', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.35, pointRadius: 3 },
+                { label: 'Soil Moisture (%)', data: [], borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', tension: 0.35, pointRadius: 3 }
             ]
         },
         options: {
@@ -399,32 +496,36 @@
                 x: { grid: { display: false } },
                 y: { grid: { color: '#f1f5f9' }, beginAtZero: true }
             },
-            plugins: { legend: { position: 'top' } }
+            plugins: { 
+                legend: { position: 'top', labels: { usePointStyle: true, font: { weight: '600' } } } 
+            }
         }
     });
 
-    // Fetch Latest Real-time Telemetry
+    // 3. Fetch Real-time Telemetry Data (/api/data)
     async function fetchLatestData() {
         try {
-            const res = await fetch('/api/data');
-            if (!res.ok) throw new Error('Network error');
+            const res = await fetch(`${API_BASE}/api/data`);
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
             const data = await res.json();
 
-            // Status indicator
+            // Status Bar Indicator
             const dot = document.getElementById('status-dot');
             const statusText = document.getElementById('status-text');
             if (data.online) {
                 dot.style.backgroundColor = '#22c55e';
+                dot.style.boxShadow = '0 0 10px #22c55e';
                 statusText.textContent = 'IoT Device Online';
             } else {
                 dot.style.backgroundColor = '#ef4444';
-                statusText.textContent = data.status === 'no_data' ? 'Awaiting Data' : 'IoT Device Offline';
+                dot.style.boxShadow = '0 0 10px #ef4444';
+                statusText.textContent = data.status === 'no_data' ? 'Awaiting Telemetry' : 'IoT Device Offline';
             }
 
-            // Quick bar & main cards
-            const tempVal = data.temp !== null ? `${data.temp.toFixed(1)}` : '--';
-            const humVal = data.humidity !== null ? `${data.humidity.toFixed(1)}` : '--';
-            const moistVal = data.moisture !== null ? `${data.moisture}` : '--';
+            // Temperature, Humidity, Moisture Cards
+            const tempVal = (data.temp !== null && data.temp !== undefined) ? `${data.temp.toFixed(1)}` : '--';
+            const humVal  = (data.humidity !== null && data.humidity !== undefined) ? `${data.humidity.toFixed(1)}` : '--';
+            const moistVal = (data.moisture !== null && data.moisture !== undefined) ? `${data.moisture}` : '--';
 
             document.getElementById('val-temp').textContent = `${tempVal} °C`;
             document.getElementById('val-humidity').textContent = `${humVal} %`;
@@ -435,7 +536,7 @@
             document.getElementById('quick-moist').textContent = `${moistVal}%`;
 
             // Gauge chart update
-            const moistNum = data.moisture !== null ? data.moisture : 0;
+            const moistNum = (data.moisture !== null && data.moisture !== undefined) ? data.moisture : 0;
             gaugeChart.data.datasets[0].data = [moistNum, 100 - moistNum];
             gaugeChart.data.datasets[0].backgroundColor = moistNum < 30 ? ['#ef4444', '#e2e8f0'] : ['#22c55e', '#e2e8f0'];
             gaugeChart.update();
@@ -446,32 +547,40 @@
             updateBadge('badge-fan', data.fan);
             updateBadge('badge-light', data.light);
 
+            if (data.updated) {
+                document.getElementById('last-updated').textContent = `Last synchronized: ${data.updated}`;
+            }
+
         } catch (err) {
-            console.error('Fetch error:', err);
-            document.getElementById('status-dot').style.backgroundColor = '#ef4444';
-            document.getElementById('status-text').textContent = 'Connection Error';
+            console.error('Fetch latest data error:', err);
+            const dot = document.getElementById('status-dot');
+            dot.style.backgroundColor = '#ef4444';
+            dot.style.boxShadow = '0 0 10px #ef4444';
+            document.getElementById('status-text').textContent = 'API Connection Error';
         }
     }
 
-    // Fetch Historical Data for Chart
+    // 4. Fetch Historical Telemetry Data (/api/history)
     async function fetchHistory() {
         try {
-            const res = await fetch('/api/history');
+            const res = await fetch(`${API_BASE}/api/history`);
             if (!res.ok) return;
             const history = await res.json();
 
-            const labels = history.map(item => item.timestamp.split(' ')[1] || item.timestamp);
-            const temps = history.map(item => item.temp);
-            const hums = history.map(item => item.humidity);
-            const moists = history.map(item => item.moisture);
+            if (Array.isArray(history) && history.length > 0) {
+                const labels = history.map(item => item.timestamp.split(' ')[1] || item.timestamp);
+                const temps  = history.map(item => item.temp);
+                const hums   = history.map(item => item.humidity);
+                const moists = history.map(item => item.moisture);
 
-            historyChart.data.labels = labels;
-            historyChart.data.datasets[0].data = temps;
-            historyChart.data.datasets[1].data = hums;
-            historyChart.data.datasets[2].data = moists;
-            historyChart.update();
+                historyChart.data.labels = labels;
+                historyChart.data.datasets[0].data = temps;
+                historyChart.data.datasets[1].data = hums;
+                historyChart.data.datasets[2].data = moists;
+                historyChart.update();
+            }
         } catch (err) {
-            console.error('History fetch error:', err);
+            console.error('Fetch history error:', err);
         }
     }
 
@@ -486,11 +595,11 @@
         }
     }
 
-    // Poll loops
-    setInterval(fetchLatestData, 3000);
-    setInterval(fetchHistory, 15000);
+    // Polling Intervals
+    setInterval(fetchLatestData, 3000);  // Poll real-time data every 3 seconds
+    setInterval(fetchHistory, 15000);    // Poll history data every 15 seconds
 
-    // Initial load
+    // Initial Execution
     fetchLatestData();
     fetchHistory();
 </script>
