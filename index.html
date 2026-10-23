@@ -66,7 +66,6 @@
         .card.temp { border-top-color: var(--sun); } .card.temp .value { color: #c1440e; }
         .card.humidity { border-top-color: var(--sky-dark); } .card.humidity .value { color: #2a6f97; }
         .card.moisture { border-top-color: var(--bark); } .card.moisture .value { color: #6b4423; }
-        .card.height { border-top-color: var(--leaf); } .card.height .value { color: var(--leaf); }
         body.device-offline .card { opacity: 0.55; filter: grayscale(0.4); }
         body.device-offline .card .value { color: #94a39a; }
 
@@ -162,10 +161,6 @@
             <span class="card-icon">🌱</span><h3>Soil Moisture</h3>
             <div class="value"><span id="moisture">--</span><span class="unit">%</span></div>
         </div>
-        <div class="card height">
-            <span class="card-icon">📏</span><h3>Plant Height</h3>
-            <div class="value"><span id="height">--</span><span class="unit">cm</span></div>
-        </div>
     </div>
 
     <h2 class="section-title">Irrigation &amp; Climate Control</h2>
@@ -207,18 +202,12 @@
 
     <h2 class="section-title">Historical Trends</h2>
     <div class="chart-panel">
-        <div class="panel-head"><h2>📈 Climate &amp; Growth History</h2><span class="hint">Last 50 records · updates every 10s</span></div>
+        <div class="panel-head"><h2>📈 Climate History</h2><span class="hint">Last 50 records · updates every 10s</span></div>
         <canvas id="telemetryChart" height="110"></canvas>
     </div>
-    <div class="chart-row">
-        <div class="chart-panel">
-            <div class="panel-head"><h2>🌡️ Temperature &amp; Humidity</h2><span class="hint">Dual axis</span></div>
-            <canvas id="thChart" height="130"></canvas>
-        </div>
-        <div class="chart-panel">
-            <div class="panel-head"><h2>🌱 Growth Trajectory</h2><span class="hint">Plant height (cm)</span></div>
-            <canvas id="heightChart" height="130"></canvas>
-        </div>
+    <div class="chart-panel">
+        <div class="panel-head"><h2>🌡️ Temperature &amp; Humidity</h2><span class="hint">Dual axis</span></div>
+        <canvas id="thChart" height="130"></canvas>
     </div>
     <footer class="farm-footer">
         <div class="divider"></div>
@@ -245,8 +234,7 @@
             labels: [],
             datasets: [
                 { label: 'Temperature (°C)', borderColor: '#f4a261', backgroundColor: 'rgba(244,162,97,0.08)', data: [], fill: true, tension: 0.35, pointRadius: 2, borderWidth: 2.5 },
-                { label: 'Humidity (%)', borderColor: '#457b9d', backgroundColor: 'rgba(69,123,157,0.08)', data: [], fill: true, tension: 0.35, pointRadius: 2, borderWidth: 2.5 },
-                { label: 'Plant Height (cm)', borderColor: '#40916c', backgroundColor: 'rgba(64,145,108,0.08)', data: [], fill: true, tension: 0.35, pointRadius: 2, borderWidth: 2.5 }
+                { label: 'Humidity (%)', borderColor: '#457b9d', backgroundColor: 'rgba(69,123,157,0.08)', data: [], fill: true, tension: 0.35, pointRadius: 2, borderWidth: 2.5 }
             ]
         },
         options: {
@@ -271,18 +259,7 @@
             responsive: true, maintainAspectRatio: true,
             interaction: { mode: 'index', intersect: false },
             plugins: { legend: { position: 'top', align: 'end' }, tooltip: { backgroundColor: 'rgba(27,67,50,0.95)', padding: 10, cornerRadius: 8 } },
-            scales: { x: { grid: { color: gridColor }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 6 } }, y: { type: 'linear', position: 'left', title: { display: true, text: '°C', color: '#f4a261' }, grid: { color: gridColor }, ticks: { color: '#c1440e' } }, y1: { type: 'linear', position: 'right', title: { display: true, text: '%', color: '#457b9d' }, grid: { drawOnChartArea: false }, ticks: { color: '#2a6f97' }, min: 0, max: 100 } }
-        }
-    });
-
-    const hCtx = document.getElementById('heightChart').getContext('2d');
-    const heightChart = new Chart(hCtx, {
-        type: 'line',
-        data: { labels: [], datasets: [{ label: 'Height (cm)', borderColor: '#2d6a4f', backgroundColor: 'rgba(64,145,108,0.15)', data: [], fill: true, tension: 0.35, pointRadius: 2.5, borderWidth: 2.5 }] },
-        options: {
-            responsive: true, maintainAspectRatio: true,
-            plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(27,67,50,0.95)', padding: 10, cornerRadius: 8 } },
-            scales: { x: { grid: { color: gridColor }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 6 } }, y: { title: { display: true, text: 'cm', color: '#40916c' }, grid: { color: gridColor }, ticks: { color: '#2d6a4f' }, beginAtZero: true } }
+            scales: { x: { grid: { color: gridColor }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 6 } }, y: { type: 'linear', position: 'left', title: { display: true, text: '°C', color: '#f4a261' }, grid: { color: gridColor }, ticks: { color: '#c1440e' } }, y1: { type: 'linear', position: 'right', title: { display: true, text: '%', color: '#457b9d' }, grid: { drawOnChartArea: false }, ticks: { color: '#2a6f97' }, min: 0, max: 100 } } }
         }
     });
 
@@ -293,11 +270,10 @@
             const history = await res.json();
             history.forEach(item => {
                 const label = item.timestamp.split(" ")[1] || item.timestamp;
-                chart.data.labels.push(label); chart.data.datasets[0].data.push(item.temp); chart.data.datasets[1].data.push(item.humidity); chart.data.datasets[2].data.push(item.height);
+                chart.data.labels.push(label); chart.data.datasets[0].data.push(item.temp); chart.data.datasets[1].data.push(item.humidity);
                 thChart.data.labels.push(label); thChart.data.datasets[0].data.push(item.temp); thChart.data.datasets[1].data.push(item.humidity);
-                heightChart.data.labels.push(label); heightChart.data.datasets[0].data.push(item.height);
             });
-            chart.update(); thChart.update(); heightChart.update();
+            chart.update(); thChart.update();
         } catch (err) { console.error("Failed to load history:", err); }
     }
 
@@ -368,7 +344,6 @@
             document.getElementById('temp').innerText = Number(data.temp).toFixed(1);
             document.getElementById('humidity').innerText = Number(data.humidity).toFixed(1);
             document.getElementById('moisture').innerText = data.moisture;
-            document.getElementById('height').innerText = Number(data.height).toFixed(1);
 
             document.getElementById('iotTemp').innerText = Number(data.temp).toFixed(1);
             document.getElementById('iotHum').innerText = Number(data.humidity).toFixed(1);
@@ -387,9 +362,8 @@
                 const label = new Date().toLocaleTimeString();
                 const trim = (c) => { if (c.data.labels.length > 50) { c.data.labels.shift(); c.data.datasets.forEach(d => d.data.shift()); } };
                 
-                trim(chart); chart.data.labels.push(label); chart.data.datasets[0].data.push(data.temp); chart.data.datasets[1].data.push(data.humidity); chart.data.datasets[2].data.push(data.height); chart.update('none');
+                trim(chart); chart.data.labels.push(label); chart.data.datasets[0].data.push(data.temp); chart.data.datasets[1].data.push(data.humidity); chart.update('none');
                 trim(thChart); thChart.data.labels.push(label); thChart.data.datasets[0].data.push(data.temp); thChart.data.datasets[1].data.push(data.humidity); thChart.update('none');
-                trim(heightChart); heightChart.data.labels.push(label); heightChart.data.datasets[0].data.push(data.height); heightChart.update('none');
             }
         } catch (err) {
             console.error("Failed to fetch dashboard data:", err);
