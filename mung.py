@@ -6,12 +6,10 @@ from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
 
-# ==========================================
-# DATABASE CONFIGURATION
-# ==========================================
+# database config
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# Handle Vercel/Heroku postgres:// prefix quirk
+# vercel/heroku gives postgres:// but psycopg2 wants postgresql://
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
@@ -32,7 +30,6 @@ def init_db():
                 temperature REAL,
                 humidity REAL,
                 soil_moisture INTEGER,
-                plant_height REAL,
                 pump_state INTEGER,
                 fan_state INTEGER,
                 light_state INTEGER
@@ -44,12 +41,10 @@ def init_db():
     except Exception as e:
         print(f"DB Init Error: {e}")
 
-# Run on cold start
+# run on cold start
 init_db()
 
-# ==========================================
-# ESP32 TELEMETRY RECEIVER (POST)
-# ==========================================
+# receive data from esp32
 @app.route('/api/data', methods=['POST'])
 def receive_data():
     try:
@@ -61,11 +56,11 @@ def receive_data():
         cur = conn.cursor()
         cur.execute('''
             INSERT INTO sensor_logs 
-            (temperature, humidity, soil_moisture, plant_height, pump_state, fan_state, light_state) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            (temperature, humidity, soil_moisture, pump_state, fan_state, light_state) 
+            VALUES (%s, %s, %s, %s, %s, %s)
         ''', (
             data.get('temperature', 0.0), data.get('humidity', 0.0), 
-            data.get('soil_moisture', 0), data.get('plant_height', 0.0), 
+            data.get('soil_moisture', 0), 
             data.get('pump_state', 0), data.get('fan_state', 0), data.get('light_state', 0)
         ))
         conn.commit()
@@ -75,9 +70,7 @@ def receive_data():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# ==========================================
-# DASHBOARD REAL-TIME DATA (GET)
-# ==========================================
+# latest reading for dashboard
 @app.route('/api/data', methods=['GET'])
 def get_latest_data():
     try:
@@ -85,7 +78,7 @@ def get_latest_data():
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute('''
             SELECT timestamp, temperature, humidity, soil_moisture, 
-                   plant_height, pump_state, fan_state, light_state 
+                   pump_state, fan_state, light_state 
             FROM sensor_logs ORDER BY id DESC LIMIT 1
         ''')
         latest = cur.fetchone()
@@ -109,7 +102,6 @@ def get_latest_data():
                 "temp": latest['temperature'],
                 "humidity": latest['humidity'],
                 "moisture": latest['soil_moisture'],
-                "height": latest['plant_height'],
                 "pump": latest['pump_state'],
                 "fan": latest['fan_state'],
                 "light": latest['light_state']
@@ -120,19 +112,17 @@ def get_latest_data():
     return jsonify({
         "online": False, "status": "no_data", "status_message": "Awaiting Telemetry",
         "updated": "--", "temp": 0.0, "humidity": 0.0, "moisture": 0, 
-        "height": 0.0, "pump": 0, "fan": 0, "light": 0
+        "pump": 0, "fan": 0, "light": 0
     })
 
-# ==========================================
-# CHART HISTORICAL DATA (GET)
-# ==========================================
+# history for charts
 @app.route('/api/history', methods=['GET'])
 def get_history():
     try:
         conn = get_conn()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute('''
-            SELECT timestamp, temperature, humidity, soil_moisture, plant_height 
+            SELECT timestamp, temperature, humidity, soil_moisture 
             FROM sensor_logs ORDER BY id DESC LIMIT 50
         ''')
         rows = cur.fetchall()
@@ -145,15 +135,13 @@ def get_history():
             ts_str = ts.strftime('%Y-%m-%d %H:%M:%S') if isinstance(ts, datetime) else str(ts)
             history.append({
                 "timestamp": ts_str, "temp": r['temperature'], 
-                "humidity": r['humidity'], "moisture": r['soil_moisture'], "height": r['plant_height']
+                "humidity": r['humidity'], "moisture": r['soil_moisture']
             })
         return jsonify(history)
     except Exception:
         return jsonify([])
 
-# ==========================================
-# HTML DASHBOARD ROUTE
-# ==========================================
+# dashboard page
 @app.route('/')
 def dashboard():
     base_dir = os.path.dirname(os.path.abspath(__file__))
