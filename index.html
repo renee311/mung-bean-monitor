@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mung Bean Greenhouse - Smart Station</title>
+    <title>Mung Bean Monitoring - Smart Greenhouse</title>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Google Fonts for a cleaner, agricultural look -->
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Merriweather:wght@700&display=swap" rel="stylesheet">
     
     <style>
@@ -39,10 +39,10 @@
 
         body {
             font-family: 'DM Sans', sans-serif;
-            /* Background simulating looking through greenhouse glass */
+            /* Background with a lush mung bean/leafy field */
             background: 
-                linear-gradient(135deg, rgba(20, 38, 28, 0.9), rgba(20, 38, 28, 0.7)),
-                url('https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=1920&q=80');
+                linear-gradient(135deg, rgba(20, 38, 28, 0.85), rgba(20, 38, 28, 0.65)),
+                url('https://images.unsplash.com/photo-1592417817098-8f3d6eb12765?auto=format&fit=crop&w=1920&q=80');
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
@@ -106,18 +106,19 @@
             font-weight: 700;
             color: #ffffff;
             letter-spacing: -0.5px;
-            text-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            text-shadow: 0 4px 12px rgba(0,0,0,0.4);
         }
 
         .subtitle {
             font-size: 0.95rem;
             color: #cbd5e1;
             margin-top: 8px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
 
         /* Top Status Bar */
         .status-bar {
-            background: rgba(30, 41, 59, 0.6);
+            background: rgba(30, 41, 59, 0.7);
             border: 1px solid var(--border-glass);
             border-radius: 20px;
             padding: 12px 24px;
@@ -174,6 +175,7 @@
             color: var(--text-light);
             text-transform: uppercase;
             letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.4);
         }
 
         .section-title::before {
@@ -200,7 +202,7 @@
             margin-bottom: 35px;
         }
 
-        /* Cards (Frosted Glass & White Panels) */
+        /* Cards */
         .card {
             background: var(--bg-card);
             border-radius: 20px;
@@ -345,6 +347,7 @@
             color: #94a3b8;
             text-align: center;
             font-weight: 500;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
         }
 
         /* Animations */
@@ -378,9 +381,9 @@
     <header>
         <div class="header-brand">
             <span>🌱</span>
-            <span>Mung Bean Greenhouse Station</span>
+            <span>Smart Greenhouse Station</span>
         </div>
-        <h1>Precision Agriculture</h1>
+        <h1>Mung Bean Monitoring</h1>
         <div class="subtitle">Live microclimate telemetry & automated environmental control</div>
     </header>
 
