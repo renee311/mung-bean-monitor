@@ -23,10 +23,11 @@ def init_db():
     try:
         conn = get_conn()
         cur = conn.cursor()
+        # Using TIMESTAMPTZ to ensure timezone accuracy
         cur.execute('''
             CREATE TABLE IF NOT EXISTS sensor_logs (
                 id SERIAL PRIMARY KEY,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                 temperature REAL,
                 humidity REAL,
                 soil_moisture INTEGER,
@@ -68,6 +69,7 @@ def receive_data():
         conn.close()
         return jsonify({"status": "success"}), 200
     except Exception as e:
+        print(f"POST Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # latest reading for dashboard
@@ -87,18 +89,21 @@ def get_latest_data():
 
         if latest:
             ts = latest['timestamp']
+            # Handle timezone-aware comparison
             if isinstance(ts, datetime):
                 last_dt = ts.replace(tzinfo=timezone.utc) if ts.tzinfo is None else ts
             else:
                 last_dt = datetime.strptime(str(ts), '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
 
-            is_online = (datetime.now(timezone.utc) - last_dt) < timedelta(seconds=30)
+            # Check if last update was within the last 30 seconds
+            now_utc = datetime.now(timezone.utc)
+            is_online = (now_utc - last_dt) < timedelta(seconds=30)
             
             return jsonify({
                 "online": is_online,
                 "status": "online" if is_online else "offline",
                 "status_message": "IoT Device Online" if is_online else "IoT Device Offline",
-                "updated": last_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                "updated": last_dt.strftime('%Y-%m-%d %H:%M:%S UTC'),
                 "temp": latest['temperature'],
                 "humidity": latest['humidity'],
                 "moisture": latest['soil_moisture'],
@@ -107,8 +112,9 @@ def get_latest_data():
                 "light": latest['light_state']
             })
     except Exception as e:
-        print(f"Fetch Error: {e}")
+        print(f"GET Error: {e}")
 
+    # Fallback if no data exists yet
     return jsonify({
         "online": False, "status": "no_data", "status_message": "Awaiting Telemetry",
         "updated": "--", "temp": 0.0, "humidity": 0.0, "moisture": 0, 
@@ -138,7 +144,8 @@ def get_history():
                 "humidity": r['humidity'], "moisture": r['soil_moisture']
             })
         return jsonify(history)
-    except Exception:
+    except Exception as e:
+        print(f"History Error: {e}")
         return jsonify([])
 
 # dashboard page
